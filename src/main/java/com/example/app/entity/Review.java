@@ -26,7 +26,7 @@ public class Review {
     @JoinColumn(name = "User_ID", nullable = false)
     private User user;
 
-    @Column(name = "Rating", nullable = false)
+    @Column(name = "Rating", nullable = false, columnDefinition = "TINYINT")
     private Integer rating;
 
     @Column(name = "Comment")

@@ -26,8 +26,7 @@ public class RelatedProduct {
     private Product relatedProduct;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "Relation_Type", nullable = false)
-    private RelationType relationType;
+    @Column(name = "Relation_Type", insertable = false, updatable = false)    private RelationType relationType;
 
     public enum RelationType {
         upsell, cross_sell, accessory, similar
