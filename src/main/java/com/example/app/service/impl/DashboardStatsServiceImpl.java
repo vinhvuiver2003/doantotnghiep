@@ -115,6 +115,10 @@ public class DashboardStatsServiceImpl implements DashboardStatsService {
 
         return stats;
     }
+    @Override
+    public Map<String, Object> getSalesStatistics(LocalDateTime startDate, LocalDateTime endDate) {
+        return orderService.getSalesStatistics(startDate, endDate);
+    }
 }
 
 
