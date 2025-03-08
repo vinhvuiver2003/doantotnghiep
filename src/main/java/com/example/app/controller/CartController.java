@@ -1,7 +1,5 @@
 package com.example.app.controller;
 
-
-
 import com.example.app.dto.ApiResponse;
 import com.example.app.dto.CartDTO;
 import com.example.app.dto.CartItemDTO;
@@ -29,21 +27,20 @@ public class CartController {
      * Lấy giỏ hàng của người dùng hiện tại hoặc tạo mới nếu chưa có
      */
     @GetMapping("/my-cart")
-    public ResponseEntity<ApiResponse<?>> getMyCart() {
+    public ResponseEntity<ApiResponse<CartDTO>> getMyCart() {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
 
-        CartDTO cart;
         if (authentication != null && authentication.isAuthenticated() && !authentication.getPrincipal().equals("anonymousUser")) {
             // Người dùng đã đăng nhập
             String username = authentication.getName();
-            cart = cartService.getCartByCurrentUser(username);
+            CartDTO cart = cartService.getCartByCurrentUser(username);
+            return ResponseEntity.ok(ApiResponse.success("Cart retrieved successfully", cart));
         } else {
             // Khách chưa đăng nhập - cần session ID
+            // Sử dụng cast để khớp kiểu dữ liệu
             return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                    .body(ApiResponse.error("SessionId is required for guest cart"));
+                    .body((ApiResponse<CartDTO>) ApiResponse.error("SessionId is required for guest cart"));
         }
-
-        return ResponseEntity.ok(ApiResponse.success("Cart retrieved successfully", cart));
     }
 
     /**
@@ -114,14 +111,15 @@ public class CartController {
      * Chuyển đổi giỏ hàng khách thành giỏ hàng của người dùng sau khi đăng nhập
      */
     @PostMapping("/merge")
-    public ResponseEntity<ApiResponse<?>> mergeGuestCart(
+    public ResponseEntity<ApiResponse<CartDTO>> mergeGuestCart(
             @RequestParam String sessionId) {
 
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
 
         if (authentication == null || !authentication.isAuthenticated() || authentication.getPrincipal().equals("anonymousUser")) {
+            // Sử dụng cast để khớp kiểu dữ liệu
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                    .body(ApiResponse.error("User must be logged in to merge carts"));
+                    .body((ApiResponse<CartDTO>) ApiResponse.error("User must be logged in to merge carts"));
         }
 
         String username = authentication.getName();
