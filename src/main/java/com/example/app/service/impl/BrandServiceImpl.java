@@ -124,4 +124,4 @@ public class BrandServiceImpl implements BrandService {
         dto.setLogoUrl(brand.getLogoUrl());
         return dto;
     }
-}}
+}

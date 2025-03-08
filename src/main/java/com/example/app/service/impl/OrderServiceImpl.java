@@ -18,6 +18,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -541,5 +542,62 @@ public class OrderServiceImpl implements OrderService {
         }
 
         return dto;
+    }
+    /**
+     * Lấy danh sách đơn hàng của người dùng hiện tại dựa vào username
+
+     */
+
+    @Override
+    public PagedResponse<OrderDTO> getOrdersByCurrentUser(String username, int page, int size) {
+        // Tìm user từ username
+        User user = userRepository.findByUsername(username)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found with username: " + username));
+
+        // Lấy danh sách đơn hàng của user
+        return getOrdersByUser(user.getId(), page, size);
+    }
+
+
+
+    // Cài đặt trong OrderServiceImpl
+    @Override
+    public Map<String, Object> getSalesStatistics(LocalDateTime startDate, LocalDateTime endDate) {
+        Map<String, Object> stats = new HashMap<>();
+
+        // Tính tổng doanh số
+        BigDecimal totalSales = calculateTotalSales(startDate, endDate);
+        stats.put("totalSales", totalSales);
+
+        // Đếm tổng số đơn hàng
+        List<Order> orders = orderRepository.findOrdersByDateRange(startDate, endDate);
+        stats.put("totalOrders", orders.size());
+
+        // Tính doanh số theo trạng thái đơn hàng
+        Map<String, BigDecimal> salesByStatus = new HashMap<>();
+        for (Order.OrderStatus status : Order.OrderStatus.values()) {
+            BigDecimal statusTotal = orders.stream()
+                    .filter(order -> order.getOrderStatus() == status)
+                    .map(Order::getFinalAmount)
+                    .reduce(BigDecimal.ZERO, BigDecimal::add);
+            salesByStatus.put(status.name(), statusTotal);
+        }
+        stats.put("salesByStatus", salesByStatus);
+
+        // Tính doanh số theo ngày
+        Map<String, BigDecimal> salesByDate = new HashMap<>();
+        orders.forEach(order -> {
+            String date = order.getCreatedAt().toLocalDate().toString();
+            salesByDate.merge(date, order.getFinalAmount(), BigDecimal::add);
+        });
+        stats.put("salesByDate", salesByDate);
+
+        // Tính giá trị đơn hàng trung bình
+        BigDecimal averageOrderValue = totalSales.divide(
+                BigDecimal.valueOf(Math.max(1, orders.size())),
+                2, RoundingMode.HALF_UP);
+        stats.put("averageOrderValue", averageOrderValue);
+
+        return stats;
     }
 }

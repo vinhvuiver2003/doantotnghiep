@@ -20,6 +20,8 @@ public interface ReviewService {
     void deleteReview(Integer id);
 
     Double calculateAverageRating(Integer productId);
-
     List<ReviewDTO> getRecentReviews(Integer productId, int limit);
+    List<ReviewDTO> getReviewsByCurrentUser(String username);
+    ReviewDTO createReviewByCurrentUser(String username, ReviewDTO reviewDTO);
+    ReviewDTO updateReviewByCurrentUser(Integer id, String username, ReviewDTO reviewDTO);
 }

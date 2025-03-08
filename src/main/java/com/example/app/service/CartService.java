@@ -25,5 +25,8 @@ public interface CartService {
     void deleteExpiredCarts(int expirationDays);
 
     void mergeGuestCartWithUserCart(String sessionId, Integer userId);
+
+    CartDTO getCartByCurrentUser(String username);
+    CartDTO mergeGuestCartWithUserCart(String sessionId, String username);
 }
 

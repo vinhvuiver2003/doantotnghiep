@@ -206,4 +206,69 @@ public class ReviewServiceImpl implements ReviewService {
 
         return dto;
     }
+    @Override
+    public List<ReviewDTO> getReviewsByCurrentUser(String username) {
+        // Tìm user từ username
+        User user = userRepository.findByUsername(username)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found with username: " + username));
+
+        // Lấy danh sách đánh giá của user
+        return getReviewsByUser(user.getId());
+    }
+
+    @Override
+    @Transactional
+    public ReviewDTO createReviewByCurrentUser(String username, ReviewDTO reviewDTO) {
+        // Tìm user từ username
+        User user = userRepository.findByUsername(username)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found with username: " + username));
+
+        // Kiểm tra quyền sở hữu
+        reviewDTO.setUserId(user.getId());
+
+        // Kiểm tra xem người dùng đã mua sản phẩm chưa (tùy chọn)
+    /*
+    boolean hasPurchased = orderItemRepository.findByProductId(reviewDTO.getProductId()).stream()
+            .anyMatch(item -> item.getOrder().getUser() != null &&
+                           item.getOrder().getUser().getId().equals(user.getId()));
+
+    if (!hasPurchased) {
+        throw new IllegalArgumentException("You must purchase the product before reviewing");
+    }
+    */
+
+        // Kiểm tra xem người dùng đã đánh giá sản phẩm này chưa
+        List<Review> existingReviews = reviewRepository.findByProductId(reviewDTO.getProductId(), PageRequest.of(0, 1000)).getContent();
+        boolean hasReviewed = existingReviews.stream()
+                .anyMatch(review -> review.getUser().getId().equals(user.getId()));
+
+        if (hasReviewed) {
+            throw new IllegalArgumentException("You have already reviewed this product");
+        }
+
+        return createReview(reviewDTO);
+    }
+
+    @Override
+    @Transactional
+    public ReviewDTO updateReviewByCurrentUser(Integer id, String username, ReviewDTO reviewDTO) {
+        // Tìm user từ username
+        User user = userRepository.findByUsername(username)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found with username: " + username));
+
+        // Tìm review
+        Review review = reviewRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Review not found with id: " + id));
+
+        // Kiểm tra quyền sở hữu
+        if (!review.getUser().getId().equals(user.getId())) {
+            throw new IllegalArgumentException("You are not authorized to update this review");
+        }
+
+        // Đảm bảo không thay đổi productId và userId
+        reviewDTO.setProductId(review.getProduct().getId());
+        reviewDTO.setUserId(user.getId());
+
+        return updateReview(id, reviewDTO);
+    }
 }

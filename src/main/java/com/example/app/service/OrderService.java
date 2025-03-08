@@ -33,4 +33,6 @@ public interface OrderService {
     Long countOrders();
 
     Long countPendingOrders();
+    Map<String, Object> getSalesStatistics(LocalDateTime startDate, LocalDateTime endDate);
+    PagedResponse<OrderDTO> getOrdersByCurrentUser(String username, int page, int size);
 }
