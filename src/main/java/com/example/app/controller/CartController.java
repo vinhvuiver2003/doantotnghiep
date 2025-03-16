@@ -22,10 +22,7 @@ public class CartController {
     public CartController(CartService cartService) {
         this.cartService = cartService;
     }
-
-    /**
-     * Lấy giỏ hàng của người dùng hiện tại hoặc tạo mới nếu chưa có
-     */
+    // Lấy giỏ hàng của nguời dùng, nếu chưa có thì tạo mói
     @GetMapping("/my-cart")
     public ResponseEntity<ApiResponse<CartDTO>> getMyCart() {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
