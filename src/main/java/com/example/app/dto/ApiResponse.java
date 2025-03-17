@@ -41,4 +41,5 @@ public class ApiResponse<T> {
     public static ApiResponse<?> error(String message) {
         return new ApiResponse<>(false, message);
     }
+
 }
