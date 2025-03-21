@@ -33,7 +33,7 @@ public class ProductImageController {
         this.fileStorageService = fileStorageService;
     }
 
-    // ... existing code ...
+
 
     /**
      * Upload hình ảnh cho sản phẩm (chỉ ADMIN)
@@ -53,13 +53,12 @@ public class ProductImageController {
                 MultipartFile file = files[i];
                 // Lưu file và lấy đường dẫn
                 String filePath = fileStorageService.storeProductImage(file, (long) productId, null);
-
                 // Tạo DTO
                 ProductImageDTO imageDTO = new ProductImageDTO();
                 imageDTO.setProductId(productId);
                 imageDTO.setVariantId(variantId);
                 imageDTO.setImageURL(filePath);
-                imageDTO.setSortOrder(i == 0 && isMainImage ? 0 : i + 1); // Hình đầu tiên là hình chính nếu isMainImage = true
+                imageDTO.setSortOrder(i == 0 && isMainImage ? 0 : i + 1);
 
                 // Lưu vào database
                 ProductImageDTO savedImage = productImageService.createImage(imageDTO);
