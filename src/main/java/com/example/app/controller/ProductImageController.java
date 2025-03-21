@@ -1,14 +1,20 @@
 package com.example.app.controller;
 import com.example.app.dto.ApiResponse;
 import com.example.app.dto.ProductImageDTO;
+import com.example.app.service.FileStorageService;
 import com.example.app.service.ProductImageService;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
+import java.io.IOException;
+import java.util.ArrayList;
 import java.util.List;
 
 @RestController
@@ -16,104 +22,123 @@ import java.util.List;
 public class ProductImageController {
 
     private final ProductImageService productImageService;
+    private final FileStorageService fileStorageService;
+
+    @Value("${app.file.access-path}")
+    private String fileAccessPath;
 
     @Autowired
-    public ProductImageController(ProductImageService productImageService) {
+    public ProductImageController(ProductImageService productImageService, FileStorageService fileStorageService) {
         this.productImageService = productImageService;
+        this.fileStorageService = fileStorageService;
     }
 
-    /**
-     * Lấy danh sách hình ảnh của một sản phẩm
-     */
-    @GetMapping("/product/{productId}")
-    public ResponseEntity<ApiResponse<List<ProductImageDTO>>> getImagesByProduct(@PathVariable Integer productId) {
-        List<ProductImageDTO> images = productImageService.getImagesByProduct(productId);
-        return ResponseEntity.ok(ApiResponse.success("Product images retrieved successfully", images));
-    }
+    // ... existing code ...
 
     /**
-     * Lấy danh sách hình ảnh của một biến thể sản phẩm
+     * Upload hình ảnh cho sản phẩm (chỉ ADMIN)
      */
-    @GetMapping("/variant/{variantId}")
-    public ResponseEntity<ApiResponse<List<ProductImageDTO>>> getImagesByVariant(@PathVariable Integer variantId) {
-        List<ProductImageDTO> images = productImageService.getImagesByVariant(variantId);
-        return ResponseEntity.ok(ApiResponse.success("Variant images retrieved successfully", images));
-    }
-
-    /**
-     * Lấy chi tiết một hình ảnh
-     */
-    @GetMapping("/{id}")
-    public ResponseEntity<ApiResponse<ProductImageDTO>> getImageById(@PathVariable Integer id) {
-        ProductImageDTO image = productImageService.getImageById(id);
-        return ResponseEntity.ok(ApiResponse.success("Image retrieved successfully", image));
-    }
-
-    /**
-     * Tạo mới hình ảnh cho sản phẩm (chỉ ADMIN)
-     */
-    @PostMapping
+    @PostMapping(value = "/upload/{productId}", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<ApiResponse<ProductImageDTO>> createImage(@Valid @RequestBody ProductImageDTO imageDTO) {
-        ProductImageDTO createdImage = productImageService.createImage(imageDTO);
-        return new ResponseEntity<>(
-                ApiResponse.success("Product image created successfully", createdImage),
-                HttpStatus.CREATED);
-    }
-
-    /**
-     * Cập nhật thông tin hình ảnh (chỉ ADMIN)
-     */
-    @PutMapping("/{id}")
-    @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<ApiResponse<ProductImageDTO>> updateImage(
-            @PathVariable Integer id,
-            @Valid @RequestBody ProductImageDTO imageDTO) {
-
-        ProductImageDTO updatedImage = productImageService.updateImage(id, imageDTO);
-        return ResponseEntity.ok(ApiResponse.success("Image updated successfully", updatedImage));
-    }
-
-    /**
-     * Xóa hình ảnh (chỉ ADMIN)
-     */
-    @DeleteMapping("/{id}")
-    @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<ApiResponse<?>> deleteImage(@PathVariable Integer id) {
-        productImageService.deleteImage(id);
-        return ResponseEntity.ok(ApiResponse.success("Image deleted successfully"));
-    }
-
-    /**
-     * Xóa tất cả hình ảnh của một sản phẩm (chỉ ADMIN)
-     */
-    @DeleteMapping("/product/{productId}")
-    @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<ApiResponse<?>> deleteImagesByProduct(@PathVariable Integer productId) {
-        productImageService.deleteImagesByProduct(productId);
-        return ResponseEntity.ok(ApiResponse.success("All product images deleted successfully"));
-    }
-
-    /**
-     * Xóa tất cả hình ảnh của một biến thể sản phẩm (chỉ ADMIN)
-     */
-    @DeleteMapping("/variant/{variantId}")
-    @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<ApiResponse<?>> deleteImagesByVariant(@PathVariable Integer variantId) {
-        productImageService.deleteImagesByVariant(variantId);
-        return ResponseEntity.ok(ApiResponse.success("All variant images deleted successfully"));
-    }
-
-    /**
-     * Sắp xếp lại thứ tự hiển thị các hình ảnh (chỉ ADMIN)
-     */
-    @PostMapping("/product/{productId}/reorder")
-    @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<ApiResponse<?>> reorderImages(
+    public ResponseEntity<ApiResponse<List<ProductImageDTO>>> uploadProductImages(
             @PathVariable Integer productId,
-            @RequestBody List<Integer> imageIds) {
+            @RequestParam("files") MultipartFile[] files,
+            @RequestParam(value = "variantId", required = false) Integer variantId,
+            @RequestParam(value = "isMainImage", required = false, defaultValue = "false") boolean isMainImage) {
 
-        productImageService.reorderImages(productId, imageIds);
-        return ResponseEntity.ok(ApiResponse.success("Images reordered successfully"));
+        List<ProductImageDTO> uploadedImages = new ArrayList<>();
+
+        try {
+            for (int i = 0; i < files.length; i++) {
+                MultipartFile file = files[i];
+                // Lưu file và lấy đường dẫn
+                String filePath = fileStorageService.storeProductImage(file, (long) productId, null);
+
+                // Tạo DTO
+                ProductImageDTO imageDTO = new ProductImageDTO();
+                imageDTO.setProductId(productId);
+                imageDTO.setVariantId(variantId);
+                imageDTO.setImageURL(filePath);
+                imageDTO.setSortOrder(i == 0 && isMainImage ? 0 : i + 1); // Hình đầu tiên là hình chính nếu isMainImage = true
+
+                // Lưu vào database
+                ProductImageDTO savedImage = productImageService.createImage(imageDTO);
+                uploadedImages.add(savedImage);
+            }
+
+            return new ResponseEntity<>(
+                    ApiResponse.success("Images uploaded successfully", uploadedImages),
+                    HttpStatus.CREATED
+            );
+
+        } catch (IOException e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(new ApiResponse<List<ProductImageDTO>>(false, "Failed to upload images: " + e.getMessage(), null));
+        }
+    }
+
+    /**
+     * Lấy tất cả hình ảnh của sản phẩm kèm thông tin biến thể
+     */
+    @GetMapping("/product/{productId}/all")
+    public ResponseEntity<ApiResponse<List<ProductImageDTO>>> getAllProductImages(@PathVariable Integer productId) {
+        List<ProductImageDTO> allImages = productImageService.getAllProductImages(productId);
+        return ResponseEntity.ok(ApiResponse.success("All product images retrieved successfully", allImages));
+    }
+
+    /**
+     * Upload một hình ảnh cho biến thể sản phẩm (chỉ ADMIN)
+     */
+    @PostMapping(value = "/upload/variant/{variantId}", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<ApiResponse<ProductImageDTO>> uploadVariantImage(
+            @PathVariable Integer variantId,
+            @RequestParam("file") MultipartFile file,
+            @RequestParam("productId") Integer productId) {
+
+        try {
+            // Lưu file và lấy đường dẫn
+            String filePath = fileStorageService.storeProductImage(file, (long) productId, "variant_" + variantId);
+
+            // Tạo DTO
+            ProductImageDTO imageDTO = new ProductImageDTO();
+            imageDTO.setProductId(productId);
+            imageDTO.setVariantId(variantId);
+            imageDTO.setImageURL(filePath);
+            imageDTO.setSortOrder(0); // Hình chính của biến thể
+
+            // Lưu vào database
+            ProductImageDTO savedImage = productImageService.createImage(imageDTO);
+
+            return new ResponseEntity<>(
+                    ApiResponse.success("Variant image uploaded successfully", savedImage),
+                    HttpStatus.CREATED
+            );
+
+        } catch (IOException e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(new ApiResponse<ProductImageDTO>(false, "Failed to upload variant image: " + e.getMessage(), null));
+        }
+    }
+
+    /**
+     * Xóa hình ảnh kèm theo xóa file vật lý (chỉ ADMIN)
+     */
+    @DeleteMapping("/file/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<ApiResponse<?>> deleteImageWithFile(@PathVariable Integer id) {
+        try {
+            ProductImageDTO image = productImageService.getImageById(id);
+            // Xóa file vật lý
+            fileStorageService.deleteFile(image.getImageURL());
+            // Xóa record trong database
+            productImageService.deleteImage(id);
+            return ResponseEntity.ok(ApiResponse.success("Image and file deleted successfully"));
+        } catch (IOException e) {
+            return new ResponseEntity<>(
+                    ApiResponse.error("Failed to delete image file: " + e.getMessage()),
+                    HttpStatus.INTERNAL_SERVER_ERROR
+            );
+        }
     }
 }

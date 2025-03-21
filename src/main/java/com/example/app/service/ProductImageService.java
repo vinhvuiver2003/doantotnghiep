@@ -14,7 +14,7 @@ public interface ProductImageService {
     ProductImageDTO createImage(ProductImageDTO imageDTO);
 
     ProductImageDTO updateImage(Integer id, ProductImageDTO imageDTO);
-
+    List<ProductImageDTO> getAllProductImages(Integer productId);
     void deleteImage(Integer id);
 
     void deleteImagesByProduct(Integer productId);

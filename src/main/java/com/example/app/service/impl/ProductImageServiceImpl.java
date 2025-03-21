@@ -209,6 +209,20 @@ public class ProductImageServiceImpl implements ProductImageService {
             productImageRepository.save(image);
         });
     }
+    @Override
+    public List<ProductImageDTO> getAllProductImages(Integer productId) {
+        // Check if product exists
+        if (!productRepository.existsById(productId)) {
+            throw new ResourceNotFoundException("Product not found with id: " + productId);
+        }
+
+        // Lấy tất cả hình ảnh của sản phẩm, bao gồm cả hình cho biến thể
+        List<ProductImage> images = productImageRepository.findByProductIdOrderBySortOrder(productId);
+
+        return images.stream()
+                .map(this::convertToDTO)
+                .collect(Collectors.toList());
+    }
 
     // Utility method to convert Entity to DTO
     private ProductImageDTO convertToDTO(ProductImage image) {
