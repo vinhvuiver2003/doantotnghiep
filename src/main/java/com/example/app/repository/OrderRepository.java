@@ -29,7 +29,7 @@ public interface OrderRepository extends JpaRepository<Order, Integer> {
             @Param("endDate") LocalDateTime endDate);
 
     @Query("SELECT o FROM Order o WHERE o.guestEmail = :email OR (o.user.email = :email)")
-    List<Order> findOrdersByEmail(@Param("email") String email);
+    List<Order> findOrdersByEmail(@Param("emails") String email);
 
     @Query("SELECT COUNT(o) FROM Order o WHERE o.user.id = :userId AND o.orderStatus = 'delivered'")
     Long countCompletedOrdersByUser(@Param("userId") Integer userId);

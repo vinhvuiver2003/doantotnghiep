@@ -40,7 +40,7 @@ public class OrderSecurity {
             return order.getUser().getUsername().equals(currentUsername);
         }
 
-        // Nếu là đơn hàng khách (không có user_id), kiểm tra theo email
+        // Nếu là đơn hàng khách (không có user_id), kiểm tra theo emails
         return false; // Khách không đăng nhập không thể xác thực qua API
     }
 }

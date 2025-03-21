@@ -9,9 +9,13 @@ import com.example.app.exception.ResourceNotFoundException;
 import com.example.app.repository.UserRepository;
 import com.example.app.security.CustomUserDetailsService;
 import com.example.app.service.AuthService;
+import com.example.app.service.EmailService;
 import com.example.app.service.UserService;
+import com.example.app.service.VerificationTokenService;
+import com.example.app.util.EmailUtils;
 import com.example.app.util.JwtUtils;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
@@ -30,6 +34,12 @@ public class AuthServiceImpl implements AuthService {
     private final UserRepository userRepository;
     private final UserService userService;
     private final CustomUserDetailsService customUserDetailsService;
+    private final EmailService emailService;
+    private final EmailUtils emailUtils;
+    private final VerificationTokenService verificationTokenService;
+
+    @Value("${app.email.verification-expiry-hours}")
+    private int verificationExpiryHours;
 
     @Autowired
     public AuthServiceImpl(
@@ -37,12 +47,18 @@ public class AuthServiceImpl implements AuthService {
             JwtUtils jwtUtils,
             UserRepository userRepository,
             UserService userService,
-            CustomUserDetailsService customUserDetailsService) {
+            CustomUserDetailsService customUserDetailsService,
+            EmailService emailService,
+            EmailUtils emailUtils,
+            VerificationTokenService verificationTokenService) {
         this.authenticationManager = authenticationManager;
         this.jwtUtils = jwtUtils;
         this.userRepository = userRepository;
         this.userService = userService;
         this.customUserDetailsService = customUserDetailsService;
+        this.emailService = emailService;
+        this.emailUtils = emailUtils;
+        this.verificationTokenService = verificationTokenService;
     }
 
     @Override
@@ -66,7 +82,7 @@ public class AuthServiceImpl implements AuthService {
         User user;
         if (loginRequest.getUsernameOrEmail().contains("@")) {
             user = userRepository.findByEmail(loginRequest.getUsernameOrEmail())
-                    .orElseThrow(() -> new UsernameNotFoundException("User not found with email: " + loginRequest.getUsernameOrEmail()));
+                    .orElseThrow(() -> new UsernameNotFoundException("User not found with emails: " + loginRequest.getUsernameOrEmail()));
         } else {
             user = userRepository.findByUsername(loginRequest.getUsernameOrEmail())
                     .orElseThrow(() -> new UsernameNotFoundException("User not found with username: " + loginRequest.getUsernameOrEmail()));
@@ -87,7 +103,7 @@ public class AuthServiceImpl implements AuthService {
             throw new IllegalArgumentException("Username already exists: " + registerRequest.getUsername());
         }
 
-        // Kiểm tra email đã tồn tại
+        // Kiểm tra emails đã tồn tại
         if (userRepository.existsByEmail(registerRequest.getEmail())) {
             throw new IllegalArgumentException("Email already exists: " + registerRequest.getEmail());
         }
@@ -97,7 +113,24 @@ public class AuthServiceImpl implements AuthService {
             registerRequest.setRole("USER");
         }
 
-        return userService.registerUser(registerRequest);
+        UserDTO newUser = userService.registerUser(registerRequest);
+
+        // Lấy entity User từ repository
+        User user = userRepository.findById(newUser.getId())
+                .orElseThrow(() -> new ResourceNotFoundException("User not found after registration"));
+
+        // Tạo token xác thực
+        String verificationToken = verificationTokenService.createVerificationToken(user, verificationExpiryHours).getToken();
+        String verificationLink = emailUtils.generateVerificationLink(verificationToken);
+
+        // Gửi emails xác thực
+        emailService.sendVerificationEmail(
+                registerRequest.getEmail(),
+                registerRequest.getFirstName() + " " + registerRequest.getLastName(),
+                verificationLink
+        );
+
+        return newUser;
     }
 
     @Override
@@ -138,11 +171,9 @@ public class AuthServiceImpl implements AuthService {
     }
 
     @Override
-    @Transactional
     public void updateLastLogin(Integer userId) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found with id: " + userId));
-
         user.setLastLogin(LocalDateTime.now());
         userRepository.save(user);
     }

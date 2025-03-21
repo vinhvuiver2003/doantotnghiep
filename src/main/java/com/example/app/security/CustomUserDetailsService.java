@@ -23,11 +23,11 @@ public class CustomUserDetailsService implements UserDetailsService {
     @Override
     @Transactional
     public UserDetails loadUserByUsername(String usernameOrEmail) throws UsernameNotFoundException {
-        // Cho phép đăng nhập bằng username hoặc email
+        // Cho phép đăng nhập bằng username hoặc emails
         User user = userRepository.findByUsername(usernameOrEmail)
                 .orElseGet(() -> userRepository.findByEmail(usernameOrEmail)
                         .orElseThrow(() ->
-                                new UsernameNotFoundException("Không tồn tại tên đăng nhập hay email này: " + usernameOrEmail)
+                                new UsernameNotFoundException("Không tồn tại tên đăng nhập hay emails này: " + usernameOrEmail)
                         ));
 
         return org.springframework.security.core.userdetails.User.builder()

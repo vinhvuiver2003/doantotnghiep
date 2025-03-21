@@ -49,9 +49,9 @@ public class SecurityConfig {
         return new BCryptPasswordEncoder();
     }
 
-    /**
-     * Tạo AuthenticationProvider để xác thực người dùng
-     */
+
+    //  Tạo AuthenticationProvider để xác thực người dùng
+
     @Bean
     public AuthenticationProvider authenticationProvider() {
         DaoAuthenticationProvider authProvider = new DaoAuthenticationProvider();
@@ -60,10 +60,6 @@ public class SecurityConfig {
         return authProvider;
     }
 
-    /**
-     * Cấu hình AuthenticationManager và export nó như một Bean
-     * để có thể autowire trong các service
-     */
     @Bean
     public AuthenticationManager authenticationManager(AuthenticationConfiguration config) throws Exception {
         return config.getAuthenticationManager();
@@ -100,8 +96,6 @@ public class SecurityConfig {
                                 .requestMatchers("/api/products/**").permitAll()
                                 .requestMatchers("/api/categories/**").permitAll()
                                 .requestMatchers("/api/brands/**").permitAll()
-                                .requestMatchers("/swagger-ui/**").permitAll()
-                                .requestMatchers("/swagger-ui.html").permitAll()
                                 .requestMatchers("/api-docs/**").permitAll()
                                 .requestMatchers("/api/admin/**").hasRole("ADMIN")
                                 .anyRequest().authenticated()

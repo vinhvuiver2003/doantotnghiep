@@ -113,6 +113,8 @@ public class ProductImageController {
                     ApiResponse.success("Variant image uploaded successfully", savedImage),
                     HttpStatus.CREATED
             );
+            //bug
+
 
         } catch (IOException e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)

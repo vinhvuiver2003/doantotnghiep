@@ -6,6 +6,7 @@ import com.example.app.entity.User;
 import com.example.app.exception.ResourceNotFoundException;
 import com.example.app.repository.RoleRepository;
 import com.example.app.repository.UserRepository;
+import com.example.app.repository.VerificationTokenRepository;
 import com.example.app.service.UserService;
 import com.example.app.util.JwtUtils;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -33,19 +34,21 @@ public class UserServiceImpl implements UserService {
     private final PasswordEncoder passwordEncoder;
     private final AuthenticationManager authenticationManager;
     private final JwtUtils jwtUtils;
+    private final VerificationTokenRepository tokenRepository;
 
     @Autowired
-    public UserServiceImpl(
-            UserRepository userRepository,
-            RoleRepository roleRepository,
-            PasswordEncoder passwordEncoder,
-            AuthenticationManager authenticationManager,
-            JwtUtils jwtUtils) {
+    public UserServiceImpl(UserRepository userRepository,
+                           RoleRepository roleRepository,
+                           PasswordEncoder passwordEncoder,
+                           AuthenticationManager authenticationManager,
+                           JwtUtils jwtUtils,
+                           VerificationTokenRepository tokenRepository) {
         this.userRepository = userRepository;
         this.roleRepository = roleRepository;
         this.passwordEncoder = passwordEncoder;
         this.authenticationManager = authenticationManager;
         this.jwtUtils = jwtUtils;
+        this.tokenRepository = tokenRepository;
     }
 
     @Override
@@ -152,10 +155,18 @@ public class UserServiceImpl implements UserService {
     @Transactional
     public void deleteUser(Integer id) {
         // Check if user exists
-        if (!userRepository.existsById(id)) {
-            throw new ResourceNotFoundException("User not found with id: " + id);
+        User user = userRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found with id: " + id));
+
+        // Kiểm tra xem người dùng có vai trò ADMIN không
+        if (user.getRole().getName().equals("ROLE_ADMIN")) {
+            throw new IllegalArgumentException("Không thể xóa tài khoản Admin");
         }
 
+        // Xóa các token xác thực trước
+        tokenRepository.deleteByUser(user);
+
+        // Xóa người dùng
         userRepository.deleteById(id);
     }
 

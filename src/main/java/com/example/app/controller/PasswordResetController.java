@@ -2,15 +2,13 @@ package com.example.app.controller;
 
 import com.example.app.dto.ApiResponse;
 import com.example.app.dto.PasswordResetDTO;
-import com.example.app.dto.PasswordResetRequestDTO;
 import com.example.app.service.PasswordResetService;
-import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
-@RequestMapping("/api/auth/password")
+@RequestMapping("/api/auth")
 public class PasswordResetController {
 
     private final PasswordResetService passwordResetService;
@@ -20,41 +18,33 @@ public class PasswordResetController {
         this.passwordResetService = passwordResetService;
     }
 
-    /**
-     * Yêu cầu đặt lại mật khẩu
-     */
-    @PostMapping("/reset-request")
-    public ResponseEntity<ApiResponse<?>> requestPasswordReset(
-            @Valid @RequestBody PasswordResetRequestDTO requestDTO) {
-
+    @PostMapping("/forgot-password")
+    public ResponseEntity<ApiResponse<?>> forgotPassword(@RequestParam("email") String email) {
         try {
-            passwordResetService.createPasswordResetTokenForUser(requestDTO.getEmail());
-            return ResponseEntity.ok(ApiResponse.success(
-                    "Nếu email của bạn tồn tại trong hệ thống, một email hướng dẫn đặt lại mật khẩu sẽ được gửi đến bạn"));
+            passwordResetService.createPasswordResetTokenForUser(email);
+            return ResponseEntity.ok(ApiResponse.success("Nếu emails này đã được đăng ký, chúng tôi đã gửi cho bạn hướng dẫn đặt lại mật khẩu"));
         } catch (Exception e) {
-            // Luôn trả về thông báo thành công ngay cả khi email không tồn tại
-            // Điều này giúp tránh lộ thông tin người dùng tồn tại hay không
-            return ResponseEntity.ok(ApiResponse.success(
-                    "Nếu email của bạn tồn tại trong hệ thống, một email hướng dẫn đặt lại mật khẩu sẽ được gửi đến bạn"));
+            // Trả về thông báo thành công dù có lỗi, để tránh rò rỉ thông tin tài khoản
+            return ResponseEntity.ok(ApiResponse.success("Nếu emails này đã được đăng ký, chúng tôi đã gửi cho bạn hướng dẫn đặt lại mật khẩu"));
         }
     }
 
-    /**
-     * Xác thực token đặt lại mật khẩu
-     */
-    @GetMapping("/validate-token")
-    public ResponseEntity<ApiResponse<Boolean>> validateResetToken(@RequestParam String token) {
-        boolean valid = passwordResetService.validatePasswordResetToken(token);
-        return ResponseEntity.ok(ApiResponse.success("Trạng thái token", valid));
+    @GetMapping("/validate-reset-token")
+    public ResponseEntity<ApiResponse<Boolean>> validateResetToken(@RequestParam("token") String token) {
+        boolean isValid = passwordResetService.validatePasswordResetToken(token);
+        return ResponseEntity.ok(ApiResponse.success("Kết quả xác thực token", isValid));
     }
 
-    /**
-     * Đặt lại mật khẩu với token
-     */
-    @PostMapping("/reset")
-    public ResponseEntity<ApiResponse<?>> resetPassword(@Valid @RequestBody PasswordResetDTO passwordResetDTO) {
+    @PostMapping("/reset-password")
+    public ResponseEntity<ApiResponse<?>> resetPassword(@RequestBody PasswordResetDTO passwordResetDTO) {
+        if (!passwordResetService.validatePasswordResetToken(passwordResetDTO.getToken())) {
+            return ResponseEntity.badRequest()
+                    .body(ApiResponse.error("Token không hợp lệ hoặc đã hết hạn"));
+        }
+
         if (!passwordResetDTO.getNewPassword().equals(passwordResetDTO.getConfirmPassword())) {
-            return ResponseEntity.badRequest().body(ApiResponse.error("Mật khẩu mới và xác nhận mật khẩu không khớp"));
+            return ResponseEntity.badRequest()
+                    .body(ApiResponse.error("Mật khẩu mới và xác nhận mật khẩu không khớp"));
         }
 
         boolean result = passwordResetService.resetPassword(passwordResetDTO);
@@ -62,7 +52,8 @@ public class PasswordResetController {
         if (result) {
             return ResponseEntity.ok(ApiResponse.success("Mật khẩu đã được đặt lại thành công"));
         } else {
-            return ResponseEntity.badRequest().body(ApiResponse.error("Token không hợp lệ hoặc đã hết hạn"));
+            return ResponseEntity.badRequest()
+                    .body(ApiResponse.error("Không thể đặt lại mật khẩu"));
         }
     }
 }

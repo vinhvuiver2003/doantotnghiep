@@ -8,7 +8,9 @@ import com.example.app.dto.PaymentDTO;
 import com.example.app.entity.*;
 import com.example.app.exception.ResourceNotFoundException;
 import com.example.app.repository.*;
+import com.example.app.service.EmailService;
 import com.example.app.service.OrderService;
+import org.modelmapper.ModelMapper;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -20,6 +22,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -40,6 +43,8 @@ public class OrderServiceImpl implements OrderService {
     private final PromotionRepository promotionRepository;
     private final DeliveryRepository deliveryRepository;
     private final PaymentRepository paymentRepository;
+    private final ModelMapper modelMapper;
+    private final EmailService emailService;
 
     @Autowired
     public OrderServiceImpl(
@@ -52,7 +57,9 @@ public class OrderServiceImpl implements OrderService {
             CartItemRepository cartItemRepository,
             PromotionRepository promotionRepository,
             DeliveryRepository deliveryRepository,
-            PaymentRepository paymentRepository) {
+            PaymentRepository paymentRepository,
+            ModelMapper modelMapper,
+            EmailService emailService) {
         this.orderRepository = orderRepository;
         this.orderItemRepository = orderItemRepository;
         this.userRepository = userRepository;
@@ -63,6 +70,8 @@ public class OrderServiceImpl implements OrderService {
         this.promotionRepository = promotionRepository;
         this.deliveryRepository = deliveryRepository;
         this.paymentRepository = paymentRepository;
+        this.modelMapper = modelMapper;
+        this.emailService = emailService;
     }
 
     @Override
@@ -121,69 +130,29 @@ public class OrderServiceImpl implements OrderService {
     @Override
     @Transactional
     public OrderDTO createOrder(OrderDTO orderDTO) {
-        // Create new order
-        Order order = new Order();
+        // Kiểm tra người dùng
+        User user = userRepository.findById(orderDTO.getUserId())
+                .orElseThrow(() -> new ResourceNotFoundException("User not found with id: " + orderDTO.getUserId()));
 
-        // Set user if provided
-        if (orderDTO.getUserId() != null) {
-            User user = userRepository.findById(orderDTO.getUserId())
-                    .orElseThrow(() -> new ResourceNotFoundException("User not found with id: " + orderDTO.getUserId()));
-            order.setUser(user);
-        } else {
-            // Set guest info
-            order.setGuestEmail(orderDTO.getGuestEmail());
-            order.setGuestPhone(orderDTO.getGuestPhone());
-            order.setGuestName(orderDTO.getGuestName());
-        }
+        // Ánh xạ DTO sang entity
+        Order order = modelMapper.map(orderDTO, Order.class);
+        order.setUser(user);
+        // Thời gian tạo đơn hàng sẽ được tự động thiết lập trong @PrePersist
 
-        order.setOrderStatus(Order.OrderStatus.valueOf(orderDTO.getOrderStatus()));
-        order.setTotalAmount(orderDTO.getTotalAmount());
-        order.setDiscountAmount(orderDTO.getDiscountAmount());
-        order.setShippingFee(orderDTO.getShippingFee());
-        order.setFinalAmount(orderDTO.getFinalAmount());
-        order.setNote(orderDTO.getNote());
-
-        Order savedOrder = orderRepository.save(order);
-
-        // Process order items
-        if (orderDTO.getItems() != null && !orderDTO.getItems().isEmpty()) {
-            for (OrderItemDTO itemDTO : orderDTO.getItems()) {
-                OrderItem orderItem = new OrderItem();
-                orderItem.setOrder(savedOrder);
-
-                // Set product
-                Product product = productRepository.findById(itemDTO.getProductId())
-                        .orElseThrow(() -> new ResourceNotFoundException("Product not found with id: " + itemDTO.getProductId()));
-                orderItem.setProduct(product);
-
-                // Set variant
-                ProductVariant variant = variantRepository.findById(itemDTO.getVariantId())
-                        .orElseThrow(() -> new ResourceNotFoundException("Variant not found with id: " + itemDTO.getVariantId()));
-                orderItem.setVariant(variant);
-
-                orderItem.setQuantity(itemDTO.getQuantity());
-                orderItem.setUnitPrice(itemDTO.getUnitPrice());
-                orderItem.setDiscount(itemDTO.getDiscount());
-                orderItem.setTotal(itemDTO.getTotal());
-
-                orderItemRepository.save(orderItem);
-
-                // Update product stock
-                int remainingStock = product.getStockQuantity() - itemDTO.getQuantity();
-                product.setStockQuantity(Math.max(0, remainingStock));
-                productRepository.save(product);
-
-                // Update variant stock
-                int remainingVariantStock = variant.getStockQuantity() - itemDTO.getQuantity();
-                variant.setStockQuantity(Math.max(0, remainingVariantStock));
-                if (remainingVariantStock <= 0) {
-                    variant.setStatus(ProductVariant.VariantStatus.out_of_stock);
-                }
-                variantRepository.save(variant);
+        // Đảm bảo các OrderItem trỏ đến Order này
+        if (order.getItems() != null) {
+            for (OrderItem item : order.getItems()) {
+                item.setOrder(order);
             }
         }
 
-        return convertToDTO(savedOrder);
+        // Lưu đơn hàng
+        Order savedOrder = orderRepository.save(order);
+
+        // Gửi emails xác nhận đơn hàng
+        sendOrderConfirmationEmail(savedOrder);
+
+        return modelMapper.map(savedOrder, OrderDTO.class);
     }
 
     @Override
@@ -408,6 +377,9 @@ public class OrderServiceImpl implements OrderService {
             }
         }
 
+        // Gửi emails cập nhật trạng thái đơn hàng
+        sendOrderStatusUpdateEmail(updatedOrder, order.getOrderStatus().name());
+
         return convertToDTO(updatedOrder);
     }
 
@@ -599,5 +571,130 @@ public class OrderServiceImpl implements OrderService {
         stats.put("averageOrderValue", averageOrderValue);
 
         return stats;
+    }
+
+    // Phương thức gửi emails xác nhận đơn hàng
+    private void sendOrderConfirmationEmail(Order order) {
+        // Chuẩn bị dữ liệu cho template
+        Map<String, Object> orderDetails = new HashMap<>();
+
+        // Thông tin chung của đơn hàng
+        orderDetails.put("orderId", order.getId());
+        orderDetails.put("orderDate", order.getCreatedAt().format(DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm")));
+        orderDetails.put("customerName", order.getUser().getFirstName() + " " + order.getUser().getLastName());
+
+        // Trường hợp này giả định có payment method và địa chỉ giao hàng, thay đổi tùy theo cấu trúc thực tế
+        String paymentMethod = "Thanh toán khi nhận hàng";
+        if (order.getPayment() != null) {
+            paymentMethod = order.getPayment().getStatus().name();
+        }
+        orderDetails.put("paymentMethod", paymentMethod);
+
+        String shippingAddress = "";
+        if (order.getDelivery() != null) {
+            shippingAddress = order.getDelivery().getShippingAddress();
+        }
+        orderDetails.put("shippingAddress", shippingAddress);
+
+        // Danh sách sản phẩm
+        List<Map<String, Object>> items = order.getItems().stream().map(item -> {
+            Map<String, Object> itemMap = new HashMap<>();
+            itemMap.put("name", item.getProduct().getName());
+            itemMap.put("quantity", item.getQuantity());
+            itemMap.put("price", formatCurrency(item.getUnitPrice().doubleValue()));
+            itemMap.put("subtotal", formatCurrency(item.getTotal().doubleValue()));
+            return itemMap;
+        }).collect(Collectors.toList());
+
+        orderDetails.put("items", items);
+
+        // Tổng tiền
+        orderDetails.put("subtotal", formatCurrency(order.getTotalAmount().doubleValue()));
+        orderDetails.put("shippingFee", formatCurrency(order.getShippingFee().doubleValue()));
+        orderDetails.put("discount", formatCurrency(order.getDiscountAmount().doubleValue()));
+        orderDetails.put("total", formatCurrency(order.getFinalAmount().doubleValue()));
+
+        // Link xem chi tiết đơn hàng (có thể thay đổi theo cấu hình thực tế)
+        orderDetails.put("orderLink", "http://localhost:3000/account/orders/" + order.getId());
+
+        // Gửi emails
+        emailService.sendOrderConfirmationEmail(order.getUser().getEmail(), orderDetails);
+    }
+
+    // Phương thức gửi emails cập nhật trạng thái đơn hàng
+    private void sendOrderStatusUpdateEmail(Order order, String oldStatus) {
+        // Chỉ gửi emails khi có sự thay đổi trạng thái
+        if (oldStatus.equals(order.getOrderStatus().name())) {
+            return;
+        }
+
+        // Chuẩn bị dữ liệu cho template
+        Map<String, Object> statusDetails = new HashMap<>();
+
+        // Thông tin đơn hàng
+        statusDetails.put("orderId", order.getId());
+        statusDetails.put("orderDate", order.getCreatedAt().format(DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm")));
+        statusDetails.put("customerName", order.getUser().getFirstName() + " " + order.getUser().getLastName());
+
+        // Thông tin trạng thái
+        statusDetails.put("statusMessage", getStatusMessage(order.getOrderStatus().name()));
+        statusDetails.put("statusClass", getStatusClass(order.getOrderStatus().name()));
+
+        // Thông tin theo dõi đơn hàng (nếu có)
+        if ("SHIPPED".equals(order.getOrderStatus().name()) && order.getDelivery() != null) {
+            Map<String, String> trackingInfo = new HashMap<>();
+            Delivery delivery = order.getDelivery();
+            trackingInfo.put("carrier", delivery.getShippingMethod());
+            trackingInfo.put("trackingNumber", delivery.getTrackingNumber() != null ? delivery.getTrackingNumber() : "");
+            trackingInfo.put("estimatedDelivery", delivery.getDeliveredDate() != null ?
+                    delivery.getDeliveredDate().format(DateTimeFormatter.ofPattern("dd/MM/yyyy")) : "Đang cập nhật");
+
+            // Link theo dõi - giả định không có trường URL theo dõi
+            statusDetails.put("trackingInfo", trackingInfo);
+        }
+
+        // Lý do hủy đơn (nếu đơn bị hủy)
+        if ("CANCELLED".equals(order.getOrderStatus().name()) && order.getNote() != null) {
+            statusDetails.put("cancellationReason", order.getNote());
+        }
+
+        // Link xem chi tiết đơn hàng
+        statusDetails.put("orderLink", "http://localhost:3000/account/orders/" + order.getId());
+
+        // Gửi emails
+        emailService.sendOrderStatusUpdateEmail(order.getUser().getEmail(), statusDetails);
+    }
+
+    // Phương thức hỗ trợ
+    private double calculateSubtotal(Order order) {
+        return order.getItems().stream()
+                .mapToDouble(item -> item.getUnitPrice().multiply(BigDecimal.valueOf(item.getQuantity())).doubleValue())
+                .sum();
+    }
+
+    private String formatCurrency(double amount) {
+        return String.format("%,.0f₫", amount);
+    }
+
+    private String getStatusMessage(String status) {
+        switch (status) {
+            case "PENDING": return "Đơn hàng đang chờ xử lý";
+            case "PROCESSING": return "Đơn hàng đang được xử lý";
+            case "SHIPPED": return "Đơn hàng đã được giao cho đơn vị vận chuyển";
+            case "DELIVERED": return "Đơn hàng đã được giao thành công";
+            case "CANCELLED": return "Đơn hàng đã bị hủy";
+            default: return "Trạng thái đơn hàng đã được cập nhật";
+        }
+    }
+
+    private String getStatusClass(String status) {
+        switch (status) {
+            case "PENDING":
+            case "PROCESSING": return "status-processing";
+            case "SHIPPED": return "status-shipped";
+            case "DELIVERED": return "status-delivered";
+            case "CANCELLED": return "status-cancelled";
+            default: return "";
+        }
     }
 }

@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Xác Nhận Đơn Hàng</title>
+    <style>
+        body {
+            font-family: 'Arial', sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .header {
+            background-color: #4CAF50;
+            color: white;
+            padding: 10px 20px;
+            text-align: center;
+            border-radius: 5px 5px 0 0;
+        }
+        .content {
+            padding: 20px;
+            border: 1px solid #ddd;
+            border-top: none;
+            border-radius: 0 0 5px 5px;
+        }
+        .order-info {
+            background-color: #f9f9f9;
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+        }
+        .button {
+            display: inline-block;
+            background-color: #4CAF50;
+            color: white;
+            padding: 10px 20px;
+            text-decoration: none;
+            border-radius: 5px;
+            margin: 20px 0;
+        }
+        .footer {
+            margin-top: 20px;
+            font-size: 12px;
+            color: #777;
+            text-align: center;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+        }
+        th, td {
+            padding: 10px;
+            border-bottom: 1px solid #ddd;
+            text-align: left;
+        }
+        th {
+            background-color: #f2f2f2;
+        }
+        .price {
+            text-align: right;
+        }
+        .total-row {
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+<div class="header">
+    <h2>Xác Nhận Đơn Hàng #${orderId}</h2>
+</div>
+<div class="content">
+    <p>Xin chào <b>${customerName}</b>,</p>
+    <p>Cảm ơn bạn đã đặt hàng tại <b>Fashion Store</b>. Đơn hàng của bạn đã được xác nhận và đang được xử lý.</p>
+
+    <div class="order-info">
+        <h3>Thông Tin Đơn Hàng</h3>
+        <p><strong>Mã đơn hàng:</strong> #${orderId}</p>
+        <p><strong>Ngày đặt:</strong> ${orderDate}</p>
+        <p><strong>Phương thức thanh toán:</strong> ${paymentMethod}</p>
+        <p><strong>Địa chỉ giao hàng:</strong> ${shippingAddress}</p>
+    </div>
+
+    <h3>Sản Phẩm</h3>
+    <table>
+        <tr>
+            <th>Sản phẩm</th>
+            <th>Số lượng</th>
+            <th class="price">Giá</th>
+            <th class="price">Tổng</th>
+        </tr>
+        <#list items as item>
+        <tr>
+            <td>${item.name}</td>
+            <td>${item.quantity}</td>
+            <td class="price">${item.price}</td>
+            <td class="price">${item.subtotal}</td>
+        </tr>
+    </#list>
+    </table>
+
+    <table>
+        <tr>
+            <td>Tạm tính:</td>
+            <td class="price">${subtotal}</td>
+        </tr>
+        <tr>
+            <td>Phí vận chuyển:</td>
+            <td class="price">${shippingFee}</td>
+        </tr>
+        <tr>
+            <td>Giảm giá:</td>
+            <td class="price">${discount}</td>
+        </tr>
+        <tr class="total-row">
+            <td>Tổng cộng:</td>
+            <td class="price">${total}</td>
+        </tr>
+    </table>
+
+    <div style="text-align: center;">
+        <a class="button" href="${orderLink}">Xem Chi Tiết Đơn Hàng</a>
+    </div>
+
+    <p>Nếu bạn có bất kỳ câu hỏi nào về đơn hàng, vui lòng liên hệ với chúng tôi qua email: <a href="mailto:support@fashionstore.com">support@fashionstore.com</a> hoặc số điện thoại: <a href="tel:+84987654321">0987 654 321</a>.</p>
+
+    <p>Trân trọng,<br/>Đội ngũ Fashion Store</p>
+</div>
+<div class="footer">
+    <p>&copy; 2023 Fashion Store. Mọi quyền được bảo lưu.</p>
+    <p>Địa chỉ: 123 Đường ABC, Quận XYZ, TP. Hồ Chí Minh</p>
+</div>
+</body>
+</html>
