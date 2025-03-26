@@ -23,4 +23,7 @@ public interface ReviewRepository extends JpaRepository<Review, Integer> {
 
     @Query("SELECT r FROM Review r WHERE r.product.id = :productId ORDER BY r.createdAt DESC")
     List<Review> findRecentReviews(@Param("productId") Integer productId, Pageable pageable);
+
+    @Query("SELECT COUNT(r) FROM Review r WHERE r.product.id = :productId")
+    Long countByProductId(@Param("productId") Integer productId);
 }
