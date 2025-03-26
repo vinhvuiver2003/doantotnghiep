@@ -94,6 +94,7 @@ public class SecurityConfig {
                                 .requestMatchers("/api/public/**").permitAll()
                                 .requestMatchers("/api/auth/password/**").permitAll()
                                 .requestMatchers("/api/products/**").permitAll()
+                                .requestMatchers("/api/cart/**").permitAll()
                                 .requestMatchers("/api/categories/**").permitAll()
                                 .requestMatchers("/api/brands/**").permitAll()
                                 .requestMatchers("/api-docs/**").permitAll()
