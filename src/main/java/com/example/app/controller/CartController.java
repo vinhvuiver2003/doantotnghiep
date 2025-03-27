@@ -66,6 +66,10 @@ public class CartController {
             @PathVariable Integer cartId,
             @Valid @RequestBody CartItemDTO cartItemDTO) {
 
+        if (cartItemDTO.getQuantity() != null && cartItemDTO.getQuantity() <= 0) {
+            return ResponseEntity.badRequest().body(ApiResponse.error("Số lượng sản phẩm phải lớn hơn 0", CartDTO.class));
+        }
+
         CartDTO updatedCart = cartService.addItemToCart(cartId, cartItemDTO);
         return ResponseEntity.ok(ApiResponse.success("Item added to cart successfully", updatedCart));
     }
@@ -78,6 +82,10 @@ public class CartController {
             @PathVariable Integer cartId,
             @PathVariable Integer itemId,
             @RequestParam Integer quantity) {
+
+        if (quantity < 0) {
+            return ResponseEntity.badRequest().body(ApiResponse.error("Số lượng sản phẩm không được âm", CartDTO.class));
+        }
 
         CartDTO updatedCart = cartService.updateCartItem(cartId, itemId, quantity);
         return ResponseEntity.ok(ApiResponse.success("Cart item updated successfully", updatedCart));
