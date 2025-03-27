@@ -475,30 +475,40 @@ public class OrderServiceImpl implements OrderService {
 
         // Get order items
         List<OrderItemDTO> itemDTOs = new ArrayList<>();
-        for (OrderItem item : order.getItems()) {
-            OrderItemDTO itemDTO = new OrderItemDTO();
-            itemDTO.setId(item.getId());
-            itemDTO.setOrderId(order.getId());
-            itemDTO.setProductId(item.getProduct().getId());
-            itemDTO.setProductName(item.getProduct().getName());
-            itemDTO.setProductImage(item.getProduct().getImage());
-            itemDTO.setVariantId(item.getVariant().getId());
-            itemDTO.setColor(item.getVariant().getColor());
-            itemDTO.setSize(item.getVariant().getSize());
-            itemDTO.setQuantity(item.getQuantity());
-            itemDTO.setUnitPrice(item.getUnitPrice());
-            itemDTO.setDiscount(item.getDiscount());
-            itemDTO.setTotal(item.getTotal());
+        if (order.getItems() != null && !order.getItems().isEmpty()) {
+            for (OrderItem item : order.getItems()) {
+                OrderItemDTO itemDTO = new OrderItemDTO();
+                itemDTO.setId(item.getId());
+                itemDTO.setOrderId(order.getId());
+                
+                // Chỉ lấy thông tin cần thiết từ product để tránh vòng lặp sâu
+                if (item.getProduct() != null) {
+                    itemDTO.setProductId(item.getProduct().getId());
+                    itemDTO.setProductName(item.getProduct().getName());
+                    itemDTO.setProductImage(item.getProduct().getImage());
+                }
+                
+                // Chỉ lấy thông tin cần thiết từ variant để tránh vòng lặp sâu
+                if (item.getVariant() != null) {
+                    itemDTO.setVariantId(item.getVariant().getId());
+                    itemDTO.setColor(item.getVariant().getColor());
+                    itemDTO.setSize(item.getVariant().getSize());
+                }
+                
+                itemDTO.setQuantity(item.getQuantity());
+                itemDTO.setUnitPrice(item.getUnitPrice());
+                itemDTO.setDiscount(item.getDiscount());
+                itemDTO.setTotal(item.getTotal());
 
-            itemDTOs.add(itemDTO);
+                itemDTOs.add(itemDTO);
+            }
         }
         dto.setItems(itemDTOs);
 
         // Get delivery information if exists
-        Optional<Delivery> deliveryOpt = deliveryRepository.findByOrderId(order.getId());
-        if (deliveryOpt.isPresent()) {
-            Delivery delivery = deliveryOpt.get();
+        if (order.getDelivery() != null) {
             DeliveryDTO deliveryDTO = new DeliveryDTO();
+            Delivery delivery = order.getDelivery();
             deliveryDTO.setId(delivery.getId());
             deliveryDTO.setOrderId(order.getId());
             deliveryDTO.setShippingStatus(delivery.getShippingStatus().name());
@@ -512,13 +522,32 @@ public class OrderServiceImpl implements OrderService {
             deliveryDTO.setUpdatedAt(delivery.getUpdatedAt());
 
             dto.setDelivery(deliveryDTO);
+        } else {
+            // Nếu không có trong entity, tìm kiếm từ repository
+            Optional<Delivery> deliveryOpt = deliveryRepository.findByOrderId(order.getId());
+            if (deliveryOpt.isPresent()) {
+                Delivery delivery = deliveryOpt.get();
+                DeliveryDTO deliveryDTO = new DeliveryDTO();
+                deliveryDTO.setId(delivery.getId());
+                deliveryDTO.setOrderId(order.getId());
+                deliveryDTO.setShippingStatus(delivery.getShippingStatus().name());
+                deliveryDTO.setShippingMethod(delivery.getShippingMethod());
+                deliveryDTO.setTrackingNumber(delivery.getTrackingNumber());
+                deliveryDTO.setShippingAddress(delivery.getShippingAddress());
+                deliveryDTO.setContactPhone(delivery.getContactPhone());
+                deliveryDTO.setShippedDate(delivery.getShippedDate());
+                deliveryDTO.setDeliveredDate(delivery.getDeliveredDate());
+                deliveryDTO.setCreatedAt(delivery.getCreatedAt());
+                deliveryDTO.setUpdatedAt(delivery.getUpdatedAt());
+
+                dto.setDelivery(deliveryDTO);
+            }
         }
 
         // Get payment information if exists
-        Optional<Payment> paymentOpt = paymentRepository.findByOrderId(order.getId());
-        if (paymentOpt.isPresent()) {
-            Payment payment = paymentOpt.get();
+        if (order.getPayment() != null) {
             PaymentDTO paymentDTO = new PaymentDTO();
+            Payment payment = order.getPayment();
             paymentDTO.setId(payment.getId());
             paymentDTO.setOrderId(order.getId());
             paymentDTO.setStatus(payment.getStatus().name());
@@ -529,6 +558,23 @@ public class OrderServiceImpl implements OrderService {
             paymentDTO.setCreatedAt(payment.getCreatedAt());
 
             dto.setPayment(paymentDTO);
+        } else {
+            // Nếu không có trong entity, tìm kiếm từ repository
+            Optional<Payment> paymentOpt = paymentRepository.findByOrderId(order.getId());
+            if (paymentOpt.isPresent()) {
+                Payment payment = paymentOpt.get();
+                PaymentDTO paymentDTO = new PaymentDTO();
+                paymentDTO.setId(payment.getId());
+                paymentDTO.setOrderId(order.getId());
+                paymentDTO.setStatus(payment.getStatus().name());
+                paymentDTO.setAmount(payment.getAmount());
+                paymentDTO.setBankTransferCode(payment.getBankTransferCode());
+                paymentDTO.setBankAccount(payment.getBankAccount());
+                paymentDTO.setPaymentDate(payment.getPaymentDate());
+                paymentDTO.setCreatedAt(payment.getCreatedAt());
+
+                dto.setPayment(paymentDTO);
+            }
         }
 
         return dto;

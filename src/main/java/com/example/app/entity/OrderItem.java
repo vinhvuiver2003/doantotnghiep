@@ -1,16 +1,23 @@
 package com.example.app.entity;
 
+import com.fasterxml.jackson.annotation.JsonBackReference;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
-import lombok.Data;
+import lombok.Getter;
 import lombok.NoArgsConstructor;
+import lombok.Setter;
+import lombok.ToString;
+import lombok.EqualsAndHashCode;
 import java.math.BigDecimal;
 
 @Entity
 @Table(name = "Order_Item")
-@Data
+@Getter
+@Setter
 @NoArgsConstructor
 @AllArgsConstructor
+@ToString(exclude = {"order"})
+@EqualsAndHashCode(exclude = {"order"})
 public class OrderItem {
 
     @Id
@@ -20,6 +27,7 @@ public class OrderItem {
 
     @ManyToOne
     @JoinColumn(name = "Order_ID", nullable = false)
+    @JsonBackReference
     private Order order;
 
     @ManyToOne

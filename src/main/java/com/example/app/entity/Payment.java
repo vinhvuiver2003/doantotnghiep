@@ -1,17 +1,24 @@
 package com.example.app.entity;
 
+import com.fasterxml.jackson.annotation.JsonBackReference;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
-import lombok.Data;
+import lombok.Getter;
 import lombok.NoArgsConstructor;
+import lombok.Setter;
+import lombok.ToString;
+import lombok.EqualsAndHashCode;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "Payment")
-@Data
+@Getter
+@Setter
 @NoArgsConstructor
 @AllArgsConstructor
+@ToString(exclude = {"order"})
+@EqualsAndHashCode(exclude = {"order"})
 public class Payment {
 
     @Id
@@ -21,6 +28,7 @@ public class Payment {
 
     @OneToOne
     @JoinColumn(name = "Order_ID", nullable = false)
+    @JsonBackReference
     private Order order;
 
     @Enumerated(EnumType.STRING)
