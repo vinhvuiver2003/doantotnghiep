@@ -207,4 +207,35 @@ public class OrderController {
         Map<String, Object> salesStats = orderService.getSalesStatistics(startDate, endDate);
         return ResponseEntity.ok(ApiResponse.success("Sales statistics retrieved successfully", salesStats));
     }
+
+    /**
+     * Người dùng xác nhận đã nhận hàng
+     */
+    @PatchMapping("/{id}/confirm-delivery")
+    @PreAuthorize("@orderSecurity.isOwner(#id)")
+    public ResponseEntity<ApiResponse<OrderDTO>> confirmDelivery(@PathVariable Integer id) {
+        // Lấy thông tin người dùng hiện tại
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        String username = authentication.getName();
+        
+        OrderDTO updatedOrder = orderService.confirmOrderDelivery(id, username);
+        return ResponseEntity.ok(ApiResponse.success("Xác nhận đã nhận hàng thành công", updatedOrder));
+    }
+
+    /**
+     * Người dùng hủy đơn hàng (chỉ có thể hủy đơn hàng ở trạng thái "pending")
+     */
+    @PatchMapping("/{id}/cancel")
+    @PreAuthorize("@orderSecurity.isOwner(#id)")
+    public ResponseEntity<ApiResponse<OrderDTO>> cancelOrderByUser(
+            @PathVariable Integer id,
+            @RequestParam(required = false) String cancelReason) {
+        
+        // Lấy thông tin người dùng hiện tại
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        String username = authentication.getName();
+        
+        OrderDTO cancelledOrder = orderService.cancelOrderByUser(id, username, cancelReason);
+        return ResponseEntity.ok(ApiResponse.success("Đơn hàng đã được hủy thành công", cancelledOrder));
+    }
 }

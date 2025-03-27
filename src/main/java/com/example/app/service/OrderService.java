@@ -22,6 +22,14 @@ public interface OrderService {
 
     OrderDTO updateOrderStatus(Integer id, Order.OrderStatus status);
 
+    /**
+     * Người dùng xác nhận đã nhận được hàng
+     * @param orderId ID của đơn hàng
+     * @param username Tên đăng nhập của người dùng
+     * @return OrderDTO cập nhật
+     */
+    OrderDTO confirmOrderDelivery(Integer orderId, String username);
+
     void deleteOrder(Integer id);
 
     List<OrderDTO> getOrdersByStatus(Order.OrderStatus status);
@@ -35,4 +43,13 @@ public interface OrderService {
     Long countPendingOrders();
     Map<String, Object> getSalesStatistics(LocalDateTime startDate, LocalDateTime endDate);
     PagedResponse<OrderDTO> getOrdersByCurrentUser(String username, int page, int size);
+
+    /**
+     * Người dùng hủy đơn hàng (chỉ ở trạng thái pending)
+     * @param orderId ID của đơn hàng
+     * @param username Tên đăng nhập của người dùng
+     * @param cancelReason Lý do hủy đơn hàng
+     * @return OrderDTO đã cập nhật
+     */
+    OrderDTO cancelOrderByUser(Integer orderId, String username, String cancelReason);
 }

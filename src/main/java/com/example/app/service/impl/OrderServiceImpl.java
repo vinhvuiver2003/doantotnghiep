@@ -761,4 +761,122 @@ public class OrderServiceImpl implements OrderService {
             default: return "";
         }
     }
+
+    @Override
+    @Transactional
+    public OrderDTO confirmOrderDelivery(Integer orderId, String username) {
+        // Tìm đơn hàng
+        Order order = orderRepository.findById(orderId)
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy đơn hàng với id: " + orderId));
+
+        // Tìm user
+        User user = userRepository.findByUsername(username)
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy người dùng với username: " + username));
+
+        // Kiểm tra nếu đơn hàng thuộc về người dùng hiện tại
+        if (order.getUser() == null || !order.getUser().getId().equals(user.getId())) {
+            throw new IllegalArgumentException("Bạn không có quyền xác nhận đơn hàng này");
+        }
+
+        // Kiểm tra trạng thái đơn hàng hiện tại
+        if (order.getOrderStatus() != Order.OrderStatus.shipped) {
+            throw new IllegalStateException("Chỉ có thể xác nhận đơn hàng có trạng thái 'đang giao hàng'");
+        }
+
+        // Cập nhật trạng thái đơn hàng
+        order.setOrderStatus(Order.OrderStatus.delivered);
+
+        // Cập nhật trạng thái giao hàng nếu có
+        if (order.getDelivery() != null) {
+            order.getDelivery().setShippingStatus(Delivery.ShippingStatus.delivered);
+            order.getDelivery().setDeliveredDate(LocalDateTime.now());
+        } else {
+            // Tìm thông tin giao hàng nếu chưa được liên kết
+            Optional<Delivery> deliveryOpt = deliveryRepository.findByOrderId(order.getId());
+            if (deliveryOpt.isPresent()) {
+                Delivery delivery = deliveryOpt.get();
+                delivery.setShippingStatus(Delivery.ShippingStatus.delivered);
+                delivery.setDeliveredDate(LocalDateTime.now());
+                deliveryRepository.save(delivery);
+            }
+        }
+
+        // Lưu đơn hàng
+        Order updatedOrder = orderRepository.save(order);
+
+        // Gửi email thông báo
+        sendOrderStatusUpdateEmail(updatedOrder, Order.OrderStatus.shipped.name());
+
+        return convertToDTO(updatedOrder);
+    }
+
+    @Override
+    @Transactional
+    public OrderDTO cancelOrderByUser(Integer orderId, String username, String cancelReason) {
+        // Tìm đơn hàng
+        Order order = orderRepository.findById(orderId)
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy đơn hàng với id: " + orderId));
+
+        // Tìm user
+        User user = userRepository.findByUsername(username)
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy người dùng với username: " + username));
+
+        // Kiểm tra nếu đơn hàng thuộc về người dùng hiện tại
+        if (order.getUser() == null || !order.getUser().getId().equals(user.getId())) {
+            throw new IllegalArgumentException("Bạn không có quyền hủy đơn hàng này");
+        }
+
+        // Kiểm tra trạng thái đơn hàng hiện tại
+        if (order.getOrderStatus() != Order.OrderStatus.pending) {
+            throw new IllegalStateException("Chỉ có thể hủy đơn hàng có trạng thái 'chờ xác nhận'");
+        }
+
+        // Lưu lý do hủy nếu có
+        if (cancelReason != null && !cancelReason.trim().isEmpty()) {
+            order.setNote("Đơn hàng đã bị hủy bởi người dùng. Lý do: " + cancelReason);
+        } else {
+            order.setNote("Đơn hàng đã bị hủy bởi người dùng");
+        }
+
+        // Cập nhật trạng thái đơn hàng
+        String oldStatus = order.getOrderStatus().name();
+        order.setOrderStatus(Order.OrderStatus.cancelled);
+
+        // Cập nhật trạng thái thanh toán nếu có
+        if (order.getPayment() != null) {
+            order.getPayment().setStatus(Payment.PaymentStatus.failed);
+        } else {
+            // Tìm thông tin thanh toán nếu chưa được liên kết
+            Optional<Payment> paymentOpt = paymentRepository.findByOrderId(order.getId());
+            if (paymentOpt.isPresent()) {
+                Payment payment = paymentOpt.get();
+                payment.setStatus(Payment.PaymentStatus.failed);
+                paymentRepository.save(payment);
+            }
+        }
+
+        // Khôi phục số lượng sản phẩm trong kho
+        for (OrderItem item : order.getItems()) {
+            // Khôi phục product stock
+            Product product = item.getProduct();
+            product.setStockQuantity(product.getStockQuantity() + item.getQuantity());
+            productRepository.save(product);
+
+            // Khôi phục variant stock
+            ProductVariant variant = item.getVariant();
+            variant.setStockQuantity(variant.getStockQuantity() + item.getQuantity());
+            if (variant.getStatus() == ProductVariant.VariantStatus.out_of_stock && variant.getStockQuantity() > 0) {
+                variant.setStatus(ProductVariant.VariantStatus.active);
+            }
+            variantRepository.save(variant);
+        }
+
+        // Lưu đơn hàng
+        Order updatedOrder = orderRepository.save(order);
+
+        // Gửi email thông báo
+        sendOrderStatusUpdateEmail(updatedOrder, oldStatus);
+
+        return convertToDTO(updatedOrder);
+    }
 }
