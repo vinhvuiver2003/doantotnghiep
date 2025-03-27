@@ -3,10 +3,12 @@ package com.example.app.repository;
 
 import com.example.app.entity.Cart;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import jakarta.persistence.LockModeType;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
@@ -22,4 +24,8 @@ public interface CartRepository extends JpaRepository<Cart, Integer> {
 
     @Query("SELECT c FROM Cart c LEFT JOIN FETCH c.items WHERE c.id = :cartId")
     Optional<Cart> findByIdWithItems(@Param("cartId") Integer cartId);
+    
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT c FROM Cart c LEFT JOIN FETCH c.items WHERE c.id = :cartId")
+    Optional<Cart> findByIdWithItemsForUpdate(@Param("cartId") Integer cartId);
 }

@@ -6,6 +6,9 @@ import com.example.app.dto.CheckoutRequest;
 import com.example.app.dto.OrderDTO;
 import com.example.app.dto.PagedResponse;
 import com.example.app.entity.Order;
+import com.example.app.entity.User;
+import com.example.app.exception.ResourceNotFoundException;
+import com.example.app.repository.UserRepository;
 import com.example.app.service.OrderService;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -25,10 +28,12 @@ import java.util.Map;
 public class OrderController {
 
     private final OrderService orderService;
+    private final UserRepository userRepository;
 
     @Autowired
-    public OrderController(OrderService orderService) {
+    public OrderController(OrderService orderService, UserRepository userRepository) {
         this.orderService = orderService;
+        this.userRepository = userRepository;
     }
 
     /**
@@ -105,6 +110,35 @@ public class OrderController {
     @PostMapping("/checkout")
     public ResponseEntity<ApiResponse<OrderDTO>> checkout(
             @Valid @RequestBody CheckoutRequest checkoutRequest) {
+
+        // Kiểm tra nếu người dùng đã đăng nhập
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication != null && authentication.isAuthenticated() && 
+            !authentication.getPrincipal().equals("anonymousUser")) {
+            
+            // Lấy thông tin người dùng hiện tại
+            String username = authentication.getName();
+            User user = userRepository.findByUsername(username)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found with username: " + username));
+            
+            // Điền thông tin người dùng vào request nếu chưa có
+            if (checkoutRequest.getUserId() == null) {
+                checkoutRequest.setUserId(user.getId());
+            }
+            
+            // Điền thông tin cá nhân từ tài khoản nếu chưa được cung cấp
+            if (checkoutRequest.getEmail() == null || checkoutRequest.getEmail().isEmpty()) {
+                checkoutRequest.setEmail(user.getEmail());
+            }
+            
+            if (checkoutRequest.getName() == null || checkoutRequest.getName().isEmpty()) {
+                checkoutRequest.setName(user.getFirstName() + " " + user.getLastName());
+            }
+            
+            if (checkoutRequest.getPhone() == null || checkoutRequest.getPhone().isEmpty()) {
+                checkoutRequest.setPhone(user.getPhone());
+            }
+        }
 
         OrderDTO newOrder = orderService.processCheckout(checkoutRequest);
         return new ResponseEntity<>(

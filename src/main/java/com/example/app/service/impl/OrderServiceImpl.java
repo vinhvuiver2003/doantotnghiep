@@ -18,6 +18,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.annotation.Isolation;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -156,13 +157,26 @@ public class OrderServiceImpl implements OrderService {
     }
 
     @Override
-    @Transactional
+    @Transactional(isolation = Isolation.SERIALIZABLE)
     public OrderDTO processCheckout(CheckoutRequest checkoutRequest) {
-        // Get cart
-        Cart cart = cartRepository.findByIdWithItems(checkoutRequest.getCartId())
-                .orElseThrow(() -> new ResourceNotFoundException("Cart not found with id: " + checkoutRequest.getCartId()));
+        // Khóa giỏ hàng để đảm bảo chỉ có một giao dịch có thể xử lý tại một thời điểm
+        Integer cartId = checkoutRequest.getCartId();
+        
+        // Sử dụng pessimistic lock để khóa bản ghi giỏ hàng
+        Cart cart;
+        try {
+            cart = cartRepository.findByIdWithItemsForUpdate(cartId)
+                    .orElseThrow(() -> new ResourceNotFoundException("Cart not found with id: " + cartId));
+        } catch (Exception e) {
+            throw new IllegalStateException("Giỏ hàng đang được xử lý bởi một giao dịch khác, vui lòng thử lại sau.");
+        }
 
-        if (cart.getItems().isEmpty()) {
+        // Kiểm tra xem giỏ hàng đã được thanh toán chưa
+        if (cart.getIsCheckedOut()) {
+            throw new IllegalStateException("Giỏ hàng này đã được thanh toán");
+        }
+
+        if (cart.getItems() == null || cart.getItems().isEmpty()) {
             throw new IllegalArgumentException("Cart is empty");
         }
 
@@ -313,6 +327,10 @@ public class OrderServiceImpl implements OrderService {
         }
 
         paymentRepository.save(payment);
+
+        // Đánh dấu giỏ hàng đã được thanh toán
+        cart.setIsCheckedOut(true);
+        cartRepository.save(cart);
 
         // Clear the cart after successful checkout
         cartItemRepository.deleteByCartId(cart.getId());

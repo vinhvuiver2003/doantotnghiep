@@ -33,6 +33,9 @@ public class Cart {
     @Column(name = "Updated_at")
     private LocalDateTime updatedAt;
 
+    @Column(name = "Is_Checked_Out", nullable = false)
+    private Boolean isCheckedOut = false;
+
     @OneToMany(mappedBy = "cart", cascade = CascadeType.ALL, orphanRemoval = true)
     private Set<CartItem> items = new HashSet<>();
 
