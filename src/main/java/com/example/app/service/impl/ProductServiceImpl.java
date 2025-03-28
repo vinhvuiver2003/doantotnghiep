@@ -1,6 +1,7 @@
 package com.example.app.service.impl;
 import com.example.app.dto.PagedResponse;
 import com.example.app.dto.ProductDTO;
+import com.example.app.dto.ProductImageDTO;
 import com.example.app.dto.ProductVariantDTO;
 import com.example.app.entity.*;
 import com.example.app.exception.ResourceNotFoundException;
@@ -52,35 +53,107 @@ public class ProductServiceImpl implements ProductService {
             Sort sort = sortDir.equalsIgnoreCase("desc") ? Sort.by(sortBy).descending() : Sort.by(sortBy).ascending();
             Pageable pageable = PageRequest.of(page, size, sort);
 
-            Page<Product> products = productRepository.findAll(pageable);
-            
-            List<ProductDTO> content = new ArrayList<>();
-            
-            for (Product product : products.getContent()) {
-                try {
-                    ProductDTO dto = convertToDTOSafe(product);
-                    if (dto != null) {
-                        content.add(dto);
-                    } else {
-                        System.err.println("Skipping null product DTO for product ID: " + 
-                            (product != null ? product.getId() : "unknown"));
-                    }
-                } catch (Exception e) {
-                    // Log error but continue with other products
-                    System.err.println("Error converting product with ID " + 
-                        (product != null ? product.getId() : "unknown") + ": " + e.getMessage());
-                    e.printStackTrace();
+            // Thay đổi cách truy vấn để sử dụng cách lấy dữ liệu tối ưu hơn
+            Page<Product> products;
+            if (sortBy.equals("id") || sortBy.equals("name") || sortBy.equals("basePrice")) {
+                // Lấy danh sách IDs từ query phân trang
+                List<Integer> productIds = productRepository.findAll(pageable)
+                    .stream().map(Product::getId).collect(Collectors.toList());
+                
+                if (productIds.isEmpty()) {
+                    return new PagedResponse<>(
+                        new ArrayList<>(), 
+                        page, 
+                        size, 
+                        0, 
+                        0, 
+                        true
+                    );
                 }
-            }
-
-            return new PagedResponse<>(
+                
+                // Sử dụng query tối ưu để fetch eagerly tất cả dữ liệu cần thiết
+                List<Product> productList = productRepository.findByIdInWithVariantsAndImages(productIds);
+                
+                // Sắp xếp theo thứ tự tương tự như pageable
+                productList.sort((p1, p2) -> {
+                    if (sortBy.equals("id")) {
+                        return sortDir.equalsIgnoreCase("desc") ? 
+                            p2.getId().compareTo(p1.getId()) : 
+                            p1.getId().compareTo(p2.getId());
+                    } else if (sortBy.equals("name")) {
+                        return sortDir.equalsIgnoreCase("desc") ? 
+                            p2.getName().compareTo(p1.getName()) : 
+                            p1.getName().compareTo(p2.getName());
+                    } else { // basePrice
+                        return sortDir.equalsIgnoreCase("desc") ? 
+                            p2.getBasePrice().compareTo(p1.getBasePrice()) : 
+                            p1.getBasePrice().compareTo(p2.getBasePrice());
+                    }
+                });
+                
+                // Tạo Page từ List
+                final int start = (int)pageable.getOffset();
+                final int end = Math.min((start + pageable.getPageSize()), productList.size());
+                
+                // Chỉ chuyển đổi phần tử trong phạm vi trang hiện tại
+                List<ProductDTO> content = new ArrayList<>();
+                for (int i = start; i < end; i++) {
+                    Product product = productList.get(i);
+                    try {
+                        ProductDTO dto = convertToDTOSafe(product);
+                        if (dto != null) {
+                            content.add(dto);
+                        } else {
+                            System.err.println("Skipping null product DTO for product ID: " + 
+                                (product != null ? product.getId() : "unknown"));
+                        }
+                    } catch (Exception e) {
+                        System.err.println("Error converting product with ID " + 
+                            (product != null ? product.getId() : "unknown") + ": " + e.getMessage());
+                        e.printStackTrace();
+                    }
+                }
+                
+                return new PagedResponse<>(
                     content,
-                    products.getNumber(),
-                    products.getSize(),
-                    products.getTotalElements(),
-                    products.getTotalPages(),
-                    products.isLast()
-            );
+                    page,
+                    size,
+                    productRepository.count(),
+                    (int) Math.ceil((double) productRepository.count() / size),
+                    (page + 1) * size >= productRepository.count()
+                );
+            } else {
+                // Sử dụng query thông thường nếu sắp xếp theo trường khác
+                products = productRepository.findAll(pageable);
+                
+                List<ProductDTO> content = new ArrayList<>();
+                
+                for (Product product : products.getContent()) {
+                    try {
+                        ProductDTO dto = convertToDTOSafe(product);
+                        if (dto != null) {
+                            content.add(dto);
+                        } else {
+                            System.err.println("Skipping null product DTO for product ID: " + 
+                                (product != null ? product.getId() : "unknown"));
+                        }
+                    } catch (Exception e) {
+                        // Log error but continue with other products
+                        System.err.println("Error converting product with ID " + 
+                            (product != null ? product.getId() : "unknown") + ": " + e.getMessage());
+                        e.printStackTrace();
+                    }
+                }
+
+                return new PagedResponse<>(
+                        content,
+                        products.getNumber(),
+                        products.getSize(),
+                        products.getTotalElements(),
+                        products.getTotalPages(),
+                        products.isLast()
+                );
+            }
         } catch (Exception e) {
             System.err.println("Error in getAllProducts: " + e.getMessage());
             e.printStackTrace();
@@ -225,9 +298,6 @@ public class ProductServiceImpl implements ProductService {
         if (productDTO.getBasePrice() != null && productDTO.getBasePrice().compareTo(BigDecimal.ZERO) < 0) {
             throw new IllegalArgumentException("Giá sản phẩm không được âm");
         }
-        if (productDTO.getStockQuantity() != null && productDTO.getStockQuantity() < 0) {
-            throw new IllegalArgumentException("Số lượng tồn kho không được âm");
-        }
 
         // Validate category and brand exist
         Category category = categoryRepository.findById(productDTO.getCategoryId())
@@ -243,8 +313,14 @@ public class ProductServiceImpl implements ProductService {
         product.setBasePrice(productDTO.getBasePrice() != null ? productDTO.getBasePrice() : BigDecimal.ZERO);
         product.setCategory(category);
         product.setBrand(brand);
-        product.setStockQuantity(productDTO.getStockQuantity() != null ? productDTO.getStockQuantity() : 0);
-        product.setImage(productDTO.getImage());
+        
+        // Đặt ProductType
+        if (productDTO.getProductType() != null) {
+            product.setProductType(Product.ProductType.valueOf(productDTO.getProductType()));
+        } else {
+            // Mặc định là clothing nếu không có
+            product.setProductType(Product.ProductType.clothing);
+        }
 
         if (productDTO.getStatus() != null) {
             product.setStatus(Product.ProductStatus.valueOf(productDTO.getStatus()));
@@ -253,6 +329,7 @@ public class ProductServiceImpl implements ProductService {
         Product savedProduct = productRepository.save(product);
 
         // Handle variants if provided
+        ProductVariant defaultVariant = null;
         if (productDTO.getVariants() != null && !productDTO.getVariants().isEmpty()) {
             for (ProductVariantDTO variantDTO : productDTO.getVariants()) {
                 // Validate variant
@@ -267,25 +344,66 @@ public class ProductServiceImpl implements ProductService {
                 variant.setProduct(savedProduct);
                 variant.setColor(variantDTO.getColor());
                 variant.setSize(variantDTO.getSize());
+                
+                // Set SizeType
+                if (variantDTO.getSizeType() != null) {
+                    variant.setSizeType(ProductVariant.SizeType.valueOf(variantDTO.getSizeType()));
+                } else {
+                    // Mặc định dựa theo loại sản phẩm
+                    if (product.getProductType() == Product.ProductType.footwear) {
+                        variant.setSizeType(ProductVariant.SizeType.shoe_size);
+                    } else {
+                        variant.setSizeType(ProductVariant.SizeType.clothing_size);
+                    }
+                }
+                
                 variant.setStockQuantity(variantDTO.getStockQuantity() != null ? variantDTO.getStockQuantity() : 0);
                 variant.setPriceAdjustment(variantDTO.getPriceAdjustment() != null ? variantDTO.getPriceAdjustment() : BigDecimal.ZERO);
-                variant.setImage(variantDTO.getImage());
+                variant.setSku(variantDTO.getSku());
 
                 if (variantDTO.getStatus() != null) {
                     variant.setStatus(ProductVariant.VariantStatus.valueOf(variantDTO.getStatus()));
                 }
 
-                variantRepository.save(variant);
+                variant = variantRepository.save(variant);
+                
+                // Nếu variant này được đánh dấu là mặc định hoặc chưa có variant mặc định
+                if ((variantDTO.getIsPrimary() != null && variantDTO.getIsPrimary()) || defaultVariant == null) {
+                    defaultVariant = variant;
+                }
+                
+                // Xử lý ảnh của variant
+                if (variantDTO.getImages() != null && !variantDTO.getImages().isEmpty()) {
+                    for (ProductImageDTO imageDTO : variantDTO.getImages()) {
+                        ProductImage image = new ProductImage();
+                        image.setProduct(savedProduct);
+                        image.setVariant(variant);
+                        image.setImageURL(imageDTO.getImageURL());
+                        image.setIsPrimary(imageDTO.getIsPrimary() != null ? imageDTO.getIsPrimary() : false);
+                        image.setSortOrder(imageDTO.getSortOrder() != null ? imageDTO.getSortOrder() : 0);
+                        image.setAltText(imageDTO.getAltText());
+                        
+                        productImageRepository.save(image);
+                    }
+                }
             }
         }
+        
+        // Đặt variant mặc định cho sản phẩm
+        if (defaultVariant != null) {
+            savedProduct.setDefaultVariant(defaultVariant);
+            savedProduct = productRepository.save(savedProduct);
+        }
 
-        // Handle images if provided
+        // Handle product-level images if provided
         if (productDTO.getImages() != null && !productDTO.getImages().isEmpty()) {
             int sortOrder = 0;
             for (String imageUrl : productDTO.getImages()) {
                 ProductImage image = new ProductImage();
                 image.setProduct(savedProduct);
+                image.setVariant(null); // Ảnh cấp sản phẩm, không thuộc variant nào
                 image.setImageURL(imageUrl);
+                image.setIsPrimary(sortOrder == 0); // Ảnh đầu tiên là ảnh chính
                 image.setSortOrder(sortOrder++);
 
                 productImageRepository.save(image);
@@ -302,9 +420,6 @@ public class ProductServiceImpl implements ProductService {
         if (productDTO.getBasePrice() != null && productDTO.getBasePrice().compareTo(BigDecimal.ZERO) < 0) {
             throw new IllegalArgumentException("Giá sản phẩm không được âm");
         }
-        if (productDTO.getStockQuantity() != null && productDTO.getStockQuantity() < 0) {
-            throw new IllegalArgumentException("Số lượng tồn kho không được âm");
-        }
 
         Product product = productRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Product not found with id: " + id));
@@ -313,8 +428,11 @@ public class ProductServiceImpl implements ProductService {
         product.setName(productDTO.getName());
         product.setDescription(productDTO.getDescription());
         product.setBasePrice(productDTO.getBasePrice() != null ? productDTO.getBasePrice() : product.getBasePrice());
-        product.setStockQuantity(productDTO.getStockQuantity() != null ? productDTO.getStockQuantity() : product.getStockQuantity());
-        product.setImage(productDTO.getImage());
+        
+        // Cập nhật ProductType nếu có thay đổi
+        if (productDTO.getProductType() != null) {
+            product.setProductType(Product.ProductType.valueOf(productDTO.getProductType()));
+        }
 
         if (productDTO.getStatus() != null) {
             product.setStatus(Product.ProductStatus.valueOf(productDTO.getStatus()));
@@ -341,6 +459,7 @@ public class ProductServiceImpl implements ProductService {
         Product updatedProduct = productRepository.save(product);
 
         // Handle variants if provided
+        ProductVariant defaultVariant = updatedProduct.getDefaultVariant();
         if (productDTO.getVariants() != null && !productDTO.getVariants().isEmpty()) {
             for (ProductVariantDTO variantDTO : productDTO.getVariants()) {
                 // Validate variant
@@ -353,43 +472,100 @@ public class ProductServiceImpl implements ProductService {
 
                 ProductVariant variant;
                 if (variantDTO.getId() != null) {
+                    // Cập nhật variant hiện có
                     variant = variantRepository.findById(variantDTO.getId())
                             .orElseThrow(() -> new ResourceNotFoundException("Variant not found with id: " + variantDTO.getId()));
                     variant.setColor(variantDTO.getColor());
                     variant.setSize(variantDTO.getSize());
+                    
+                    // Cập nhật SizeType
+                    if (variantDTO.getSizeType() != null) {
+                        variant.setSizeType(ProductVariant.SizeType.valueOf(variantDTO.getSizeType()));
+                    }
+                    
                     variant.setStockQuantity(variantDTO.getStockQuantity() != null ? variantDTO.getStockQuantity() : variant.getStockQuantity());
                     variant.setPriceAdjustment(variantDTO.getPriceAdjustment() != null ? variantDTO.getPriceAdjustment() : variant.getPriceAdjustment());
-                    variant.setImage(variantDTO.getImage());
+                    variant.setSku(variantDTO.getSku());
                 } else {
+                    // Tạo variant mới
                     variant = new ProductVariant();
                     variant.setProduct(updatedProduct);
                     variant.setColor(variantDTO.getColor());
                     variant.setSize(variantDTO.getSize());
+                    
+                    // Set SizeType
+                    if (variantDTO.getSizeType() != null) {
+                        variant.setSizeType(ProductVariant.SizeType.valueOf(variantDTO.getSizeType()));
+                    } else {
+                        // Mặc định dựa theo loại sản phẩm
+                        if (product.getProductType() == Product.ProductType.footwear) {
+                            variant.setSizeType(ProductVariant.SizeType.shoe_size);
+                        } else {
+                            variant.setSizeType(ProductVariant.SizeType.clothing_size);
+                        }
+                    }
+                    
                     variant.setStockQuantity(variantDTO.getStockQuantity() != null ? variantDTO.getStockQuantity() : 0);
                     variant.setPriceAdjustment(variantDTO.getPriceAdjustment() != null ? variantDTO.getPriceAdjustment() : BigDecimal.ZERO);
-                    variant.setImage(variantDTO.getImage());
+                    variant.setSku(variantDTO.getSku());
                 }
 
                 if (variantDTO.getStatus() != null) {
                     variant.setStatus(ProductVariant.VariantStatus.valueOf(variantDTO.getStatus()));
                 }
 
-                variantRepository.save(variant);
+                variant = variantRepository.save(variant);
+                
+                // Nếu variant này được đánh dấu là mặc định hoặc mặc định là variant đầu tiên nếu chưa có
+                if ((variantDTO.getIsPrimary() != null && variantDTO.getIsPrimary()) || 
+                    (defaultVariant == null && updatedProduct.getDefaultVariant() == null)) {
+                    defaultVariant = variant;
+                }
+                
+                // Xử lý ảnh của variant
+                if (variantDTO.getImages() != null) {
+                    // Xóa ảnh hiện tại của variant
+                    if (variant.getId() != null) {
+                        productImageRepository.deleteByVariantId(variant.getId());
+                    }
+                    
+                    // Thêm ảnh mới
+                    for (ProductImageDTO imageDTO : variantDTO.getImages()) {
+                        ProductImage image = new ProductImage();
+                        image.setProduct(updatedProduct);
+                        image.setVariant(variant);
+                        image.setImageURL(imageDTO.getImageURL());
+                        image.setIsPrimary(imageDTO.getIsPrimary() != null ? imageDTO.getIsPrimary() : false);
+                        image.setSortOrder(imageDTO.getSortOrder() != null ? imageDTO.getSortOrder() : 0);
+                        image.setAltText(imageDTO.getAltText());
+                        
+                        productImageRepository.save(image);
+                    }
+                }
             }
         }
+        
+        // Đặt variant mặc định cho sản phẩm
+        if (defaultVariant != null && (updatedProduct.getDefaultVariant() == null || 
+                !updatedProduct.getDefaultVariant().getId().equals(defaultVariant.getId()))) {
+            updatedProduct.setDefaultVariant(defaultVariant);
+            updatedProduct = productRepository.save(updatedProduct);
+        }
 
-        // Handle images if provided
+        // Cập nhật ảnh cấp sản phẩm nếu được cung cấp
         if (productDTO.getImages() != null) {
-            // Delete existing images
-            productImageRepository.deleteByProductId(id);
+            // Xóa ảnh hiện tại cấp sản phẩm
+            productImageRepository.deleteByProductIdAndVariantIsNull(id);
 
-            // Add new images
+            // Thêm ảnh mới
             if (!productDTO.getImages().isEmpty()) {
                 int sortOrder = 0;
                 for (String imageUrl : productDTO.getImages()) {
                     ProductImage image = new ProductImage();
                     image.setProduct(updatedProduct);
+                    image.setVariant(null); // Ảnh cấp sản phẩm, không thuộc variant nào
                     image.setImageURL(imageUrl);
+                    image.setIsPrimary(sortOrder == 0); // Ảnh đầu tiên là ảnh chính
                     image.setSortOrder(sortOrder++);
 
                     productImageRepository.save(image);
@@ -422,177 +598,232 @@ public class ProductServiceImpl implements ProductService {
 
     // Helper method for safe conversion
     private ProductDTO convertToDTOSafe(Product product) {
-        if (product == null) {
-            System.err.println("Cannot convert null product to DTO");
-            return null;
-        }
-        
         try {
+            if (product == null) {
+                return null;
+            }
+
             ProductDTO dto = new ProductDTO();
             dto.setId(product.getId());
-            dto.setName(product.getName() != null ? product.getName() : "");
+            dto.setName(product.getName());
             dto.setDescription(product.getDescription());
-            dto.setBasePrice(product.getBasePrice() != null ? product.getBasePrice() : BigDecimal.ZERO);
-
+            dto.setBasePrice(product.getBasePrice());
+            
+            // Set category info
             if (product.getCategory() != null) {
                 dto.setCategoryId(product.getCategory().getId());
                 dto.setCategoryName(product.getCategory().getName());
             }
-
+            
+            // Set brand info
             if (product.getBrand() != null) {
                 dto.setBrandId(product.getBrand().getId());
                 dto.setBrandName(product.getBrand().getName());
             }
-
-            dto.setStockQuantity(product.getStockQuantity() != null ? product.getStockQuantity() : 0);
-            dto.setImage(product.getImage());
+            
+            // Set product type
+            if (product.getProductType() != null) {
+                dto.setProductType(product.getProductType().name());
+            }
+            
+            // Tính tổng số lượng tồn kho từ các variant - đảm bảo an toàn
+            try {
+                dto.setTotalStockQuantity(product.getTotalStockQuantity());
+            } catch (Exception e) {
+                System.err.println("Error calculating total stock for product ID " + product.getId() + ": " + e.getMessage());
+                // Tính tổng theo cách thủ công
+                int totalStock = 0;
+                List<ProductVariant> safeVariants = safeCollectionCopy(product.getVariants(), 
+                    "Error copying variants for product ID ", product.getId());
+                for (ProductVariant variant : safeVariants) {
+                    if (variant != null && variant.getStockQuantity() != null) {
+                        totalStock += variant.getStockQuantity();
+                    }
+                }
+                dto.setTotalStockQuantity(totalStock);
+            }
+            
+            // Set default variant id
+            if (product.getDefaultVariant() != null) {
+                dto.setDefaultVariantId(product.getDefaultVariant().getId());
+            }
+            
             if (product.getStatus() != null) {
                 dto.setStatus(product.getStatus().name());
-            } else {
-                dto.setStatus("active"); // Default value
             }
+            
             dto.setCreatedAt(product.getCreatedAt());
             dto.setUpdatedAt(product.getUpdatedAt());
-
-            // Khởi tạo danh sách rỗng cho variants
-            List<ProductVariantDTO> variantDTOs = new ArrayList<>();
             
-            // Sao chép an toàn danh sách variants
-            List<ProductVariant> variantsList = safeCollectionCopy(
-                product.getVariants(), 
-                "Error copying variants for product ID ", 
-                product.getId()
-            );
+            // Set variants - sử dụng safeCollectionCopy
+            List<ProductVariant> safeVariants = safeCollectionCopy(product.getVariants(), 
+                "Error copying variants for product ID ", product.getId());
             
-            // Nếu không thể sao chép, thử lấy từ repository
-            if (variantsList.isEmpty() && product.getId() != null) {
-                try {
-                    variantsList = variantRepository.findByProductId(product.getId());
-                } catch (Exception e) {
-                    System.err.println("Error retrieving variants from repository for product ID " 
-                        + product.getId() + ": " + e.getMessage());
-                }
-            }
-            
-            // Xử lý từng variant từ danh sách đã sao chép
-            for (ProductVariant variant : variantsList) {
-                if (variant == null) {
-                    System.err.println("Skipping null variant for product ID: " + product.getId());
-                    continue;
-                }
-                
-                try {
-                    ProductVariantDTO variantDTO = new ProductVariantDTO();
-                    variantDTO.setId(variant.getId());
-                    variantDTO.setProductId(product.getId());
-                    variantDTO.setColor(variant.getColor() != null ? variant.getColor() : "");
-                    variantDTO.setSize(variant.getSize() != null ? variant.getSize() : "");
-                    variantDTO.setStockQuantity(variant.getStockQuantity() != null ? variant.getStockQuantity() : 0);
-                    variantDTO.setPriceAdjustment(variant.getPriceAdjustment() != null ? variant.getPriceAdjustment() : BigDecimal.ZERO);
-                    
-                    if (variant.getPriceAdjustment() != null && product.getBasePrice() != null) {
-                        variantDTO.setFinalPrice(product.getBasePrice().add(variant.getPriceAdjustment()));
-                    } else if (product.getBasePrice() != null) {
-                        variantDTO.setFinalPrice(product.getBasePrice());
-                    } else {
-                        variantDTO.setFinalPrice(BigDecimal.ZERO);
-                    }
-                    
-                    variantDTO.setImage(variant.getImage());
-                    
-                    if (variant.getStatus() != null) {
-                        variantDTO.setStatus(variant.getStatus().name());
-                    } else {
-                        variantDTO.setStatus("active"); // Default value
-                    }
-
-                    // Khởi tạo danh sách rỗng cho variant images
-                    List<String> variantImages = new ArrayList<>();
-                    
-                    // Kiểm tra và lấy ảnh biến thể an toàn
-                    if (variant.getId() != null) {
-                        try {
-                            List<ProductImage> images = productImageRepository.findByVariantId(variant.getId());
-                            if (images != null) {
-                                for (ProductImage img : images) {
-                                    if (img != null && img.getImageURL() != null) {
-                                        variantImages.add(img.getImageURL());
-                                    }
-                                }
-                            }
-                        } catch (Exception e) {
-                            System.err.println("Error getting variant images for variant ID " + variant.getId() + ": " + e.getMessage());
-                            // Continue with empty variant images list
+            if (!safeVariants.isEmpty()) {
+                List<ProductVariantDTO> variantDTOs = new ArrayList<>();
+                for (ProductVariant variant : safeVariants) {
+                    try {
+                        ProductVariantDTO variantDTO = convertVariantToDTOSafe(variant);
+                        if (variantDTO != null) {
+                            variantDTOs.add(variantDTO);
                         }
+                    } catch (Exception e) {
+                        System.err.println("Error converting variant for product ID " + product.getId() + ": " + e.getMessage());
                     }
-                    
-                    variantDTO.setImages(variantImages);
-                    variantDTOs.add(variantDTO);
-                } catch (Exception e) {
-                    System.err.println("Error converting variant for product ID " + product.getId() + ": " + e.getMessage());
-                    // Continue with next variant
                 }
+                dto.setVariants(variantDTOs);
+            } else {
+                dto.setVariants(new ArrayList<>());
             }
             
-            dto.setVariants(variantDTOs);
-
-            // Get product images - khởi tạo danh sách rỗng
-            List<String> imageUrls = new ArrayList<>();
+            // Set images (product level images) - sử dụng safeCollectionCopy
+            List<ProductImage> safeImages = safeCollectionCopy(product.getImages(), 
+                "Error copying images for product ID ", product.getId());
             
-            // Sao chép an toàn danh sách images
-            List<ProductImage> imagesList = safeCollectionCopy(
-                product.getImages(),
-                "Error copying images for product ID ",
-                product.getId()
-            );
-            
-            // Nếu không thể sao chép, thử lấy từ repository
-            if (imagesList.isEmpty() && product.getId() != null) {
-                try {
-                    imagesList = productImageRepository.findByProductId(product.getId());
-                } catch (Exception e) {
-                    System.err.println("Error retrieving images from repository for product ID " 
-                        + product.getId() + ": " + e.getMessage());
-                }
-            }
-            
-            // Xử lý từng ảnh từ danh sách đã sao chép
-            for (ProductImage img : imagesList) {
-                try {
-                    if (img != null && img.getImageURL() != null) {
+            if (!safeImages.isEmpty()) {
+                List<String> imageUrls = new ArrayList<>();
+                for (ProductImage img : safeImages) {
+                    if (img != null && img.getVariant() == null && img.getImageURL() != null) {
                         imageUrls.add(img.getImageURL());
                     }
-                } catch (Exception e) {
-                    System.err.println("Error processing image for product ID " + product.getId() + ": " + e.getMessage());
-                    // Continue with next image
                 }
+                dto.setImages(imageUrls);
+            } else {
+                dto.setImages(new ArrayList<>());
             }
             
-            dto.setImages(imageUrls);
-
-            // Calculate average rating
+            // Set review stats
             try {
-                Double avgRating = reviewRepository.calculateAverageRating(product.getId());
+                Double avgRating = reviewRepository.findAverageRatingByProductId(product.getId());
                 dto.setAverageRating(avgRating != null ? avgRating : 0.0);
-            } catch (Exception e) {
-                System.err.println("Error calculating average rating for product ID " + product.getId() + ": " + e.getMessage());
-                dto.setAverageRating(0.0);
-            }
-
-            // Count reviews - Tránh sử dụng collection trực tiếp
-            try {
+                
                 Long reviewCount = reviewRepository.countByProductId(product.getId());
                 dto.setReviewCount(reviewCount != null ? reviewCount : 0L);
             } catch (Exception e) {
-                System.err.println("Error counting reviews for product ID " + product.getId() + ": " + e.getMessage());
+                System.err.println("Error getting review stats for product ID " + product.getId() + ": " + e.getMessage());
+                dto.setAverageRating(0.0);
                 dto.setReviewCount(0L);
             }
-
-            return dto;
             
+            return dto;
         } catch (Exception e) {
-            System.err.println("Error converting product to DTO for product ID " + 
-                (product != null ? product.getId() : "null") + ": " + e.getMessage());
+            System.err.println("Error converting product to DTO: " + e.getMessage());
+            e.printStackTrace();
+            return null;
+        }
+    }
+
+    // Thêm phương thức để chuyển đổi ProductVariant sang DTO
+    private ProductVariantDTO convertVariantToDTOSafe(ProductVariant variant) {
+        try {
+            if (variant == null) {
+                return null;
+            }
+
+            ProductVariantDTO dto = new ProductVariantDTO();
+            dto.setId(variant.getId());
+            
+            if (variant.getProduct() != null) {
+                dto.setProductId(variant.getProduct().getId());
+            }
+            
+            dto.setColor(variant.getColor());
+            dto.setSize(variant.getSize());
+            
+            if (variant.getSizeType() != null) {
+                dto.setSizeType(variant.getSizeType().name());
+            }
+            
+            dto.setStockQuantity(variant.getStockQuantity());
+            dto.setPriceAdjustment(variant.getPriceAdjustment());
+            
+            try {
+                dto.setFinalPrice(variant.getFinalPrice());
+            } catch (Exception e) {
+                System.err.println("Error calculating final price for variant ID " + variant.getId() + ": " + e.getMessage());
+                // Tính thủ công
+                if (variant.getProduct() != null && variant.getProduct().getBasePrice() != null) {
+                    dto.setFinalPrice(variant.getProduct().getBasePrice().add(variant.getPriceAdjustment()));
+                } else {
+                    dto.setFinalPrice(variant.getPriceAdjustment());
+                }
+            }
+            
+            dto.setSku(variant.getSku());
+            
+            if (variant.getStatus() != null) {
+                dto.setStatus(variant.getStatus().name());
+            }
+            
+            // Check if this is the default variant
+            try {
+                Product product = variant.getProduct();
+                if (product != null && product.getDefaultVariant() != null) {
+                    dto.setIsPrimary(product.getDefaultVariant().getId().equals(variant.getId()));
+                } else {
+                    dto.setIsPrimary(false);
+                }
+            } catch (Exception e) {
+                System.err.println("Error checking if variant is primary for variant ID " + variant.getId() + ": " + e.getMessage());
+                dto.setIsPrimary(false);
+            }
+            
+            // Set variant images - sử dụng safeCollectionCopy
+            List<ProductImage> safeImages = safeCollectionCopy(variant.getImages(), 
+                "Error copying images for variant ID ", variant.getId());
+            
+            if (!safeImages.isEmpty()) {
+                List<ProductImageDTO> imageDTOs = new ArrayList<>();
+                for (ProductImage image : safeImages) {
+                    try {
+                        ProductImageDTO imageDTO = convertImageToDTOSafe(image);
+                        if (imageDTO != null) {
+                            imageDTOs.add(imageDTO);
+                        }
+                    } catch (Exception e) {
+                        System.err.println("Error converting image for variant ID " + variant.getId() + ": " + e.getMessage());
+                    }
+                }
+                dto.setImages(imageDTOs);
+            } else {
+                dto.setImages(new ArrayList<>());
+            }
+            
+            return dto;
+        } catch (Exception e) {
+            System.err.println("Error converting variant to DTO: " + e.getMessage());
+            e.printStackTrace();
+            return null;
+        }
+    }
+
+    // Thêm phương thức để chuyển đổi ProductImage sang DTO
+    private ProductImageDTO convertImageToDTOSafe(ProductImage image) {
+        try {
+            if (image == null) {
+                return null;
+            }
+
+            ProductImageDTO dto = new ProductImageDTO();
+            dto.setId(image.getId());
+            
+            if (image.getProduct() != null) {
+                dto.setProductId(image.getProduct().getId());
+            }
+            
+            if (image.getVariant() != null) {
+                dto.setVariantId(image.getVariant().getId());
+            }
+            
+            dto.setImageURL(image.getImageURL());
+            dto.setIsPrimary(image.getIsPrimary());
+            dto.setSortOrder(image.getSortOrder());
+            dto.setAltText(image.getAltText());
+            dto.setCreatedAt(image.getCreatedAt());
+            
+            return dto;
+        } catch (Exception e) {
+            System.err.println("Error converting image to DTO: " + e.getMessage());
             e.printStackTrace();
             return null;
         }

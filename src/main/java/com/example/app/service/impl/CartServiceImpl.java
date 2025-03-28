@@ -5,6 +5,7 @@ import com.example.app.dto.CartItemDTO;
 import com.example.app.entity.Cart;
 import com.example.app.entity.CartItem;
 import com.example.app.entity.Product;
+import com.example.app.entity.ProductImage;
 import com.example.app.entity.ProductVariant;
 import com.example.app.entity.User;
 import com.example.app.exception.ResourceNotFoundException;
@@ -50,7 +51,7 @@ public class CartServiceImpl implements CartService {
 
     @Override
     public CartDTO getCartById(Integer id) {
-        Cart cart = cartRepository.findByIdWithItems(id)
+        Cart cart = cartRepository.findByIdWithFullDetails(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Cart not found with id: " + id));
 
         return convertToDTO(cart);
@@ -63,7 +64,7 @@ public class CartServiceImpl implements CartService {
                 .orElseThrow(() -> new ResourceNotFoundException("User not found with id: " + userId));
 
         // Find user's cart or create a new one
-        Optional<Cart> optionalCart = cartRepository.findByUserId(userId);
+        Optional<Cart> optionalCart = cartRepository.findByUserIdWithFullDetails(userId);
 
         if (optionalCart.isPresent()) {
             Cart cart = optionalCart.get();
@@ -77,7 +78,7 @@ public class CartServiceImpl implements CartService {
     @Override
     public CartDTO getCartBySessionId(String sessionId) {
         // Find cart by session ID or create a new one
-        Optional<Cart> optionalCart = cartRepository.findBySessionId(sessionId);
+        Optional<Cart> optionalCart = cartRepository.findBySessionIdWithFullDetails(sessionId);
 
         if (optionalCart.isPresent()) {
             Cart cart = optionalCart.get();
@@ -113,10 +114,10 @@ public class CartServiceImpl implements CartService {
         Cart cart = cartRepository.findById(cartId)
                 .orElseThrow(() -> new ResourceNotFoundException("Cart not found with id: " + cartId));
 
-        Product product = productRepository.findById(cartItemDTO.getProductId())
+        Product product = productRepository.findByIdWithImagesAndDefaultVariant(cartItemDTO.getProductId())
                 .orElseThrow(() -> new ResourceNotFoundException("Product not found with id: " + cartItemDTO.getProductId()));
 
-        ProductVariant variant = variantRepository.findById(cartItemDTO.getVariantId())
+        ProductVariant variant = variantRepository.findByIdWithImages(cartItemDTO.getVariantId())
                 .orElseThrow(() -> new ResourceNotFoundException("Variant not found with id: " + cartItemDTO.getVariantId()));
 
         // Check if product is active
@@ -157,7 +158,7 @@ public class CartServiceImpl implements CartService {
         cartRepository.save(cart);
 
         // Refresh cart data
-        Cart updatedCart = cartRepository.findByIdWithItems(cartId)
+        Cart updatedCart = cartRepository.findByIdWithFullDetails(cartId)
                 .orElseThrow(() -> new ResourceNotFoundException("Cart not found with id: " + cartId));
 
         return convertToDTO(updatedCart);
@@ -197,7 +198,7 @@ public class CartServiceImpl implements CartService {
         cartRepository.save(cart);
 
         // Refresh cart data
-        Cart updatedCart = cartRepository.findByIdWithItems(cartId)
+        Cart updatedCart = cartRepository.findByIdWithFullDetails(cartId)
                 .orElseThrow(() -> new ResourceNotFoundException("Cart not found with id: " + cartId));
 
         return convertToDTO(updatedCart);
@@ -224,7 +225,7 @@ public class CartServiceImpl implements CartService {
         cartRepository.save(cart);
 
         // Refresh cart data
-        Cart updatedCart = cartRepository.findByIdWithItems(cartId)
+        Cart updatedCart = cartRepository.findByIdWithFullDetails(cartId)
                 .orElseThrow(() -> new ResourceNotFoundException("Cart not found with id: " + cartId));
 
         return convertToDTO(updatedCart);
@@ -342,7 +343,10 @@ public class CartServiceImpl implements CartService {
             itemDTO.setCartId(cart.getId());
             itemDTO.setProductId(item.getProduct().getId());
             itemDTO.setProductName(item.getProduct().getName());
-            itemDTO.setProductImage(item.getProduct().getImage());
+            
+            // Sử dụng phương thức tiện ích để lấy ảnh đại diện
+            itemDTO.setProductImage(item.getProduct().getMainImageUrl());
+            
             itemDTO.setVariantId(item.getVariant().getId());
             itemDTO.setColor(item.getVariant().getColor());
             itemDTO.setSize(item.getVariant().getSize());

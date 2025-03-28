@@ -5,6 +5,8 @@ import com.example.app.dto.ProductDTO;
 import com.example.app.entity.Order;
 import com.example.app.entity.OrderItem;
 import com.example.app.entity.Product;
+import com.example.app.entity.ProductImage;
+import com.example.app.entity.ProductVariant;
 import com.example.app.entity.User;
 import com.example.app.repository.*;
 import com.example.app.service.DashboardStatsService;
@@ -84,8 +86,8 @@ public class DashboardStatsServiceImpl implements DashboardStatsService {
                 .count();
         stats.setPendingOrders(pendingOrders);
 
-        // Sản phẩm sắp hết hàng
-        List<Product> lowStockProducts = productRepository.findLowStockProducts(10);
+        // Sản phẩm sắp hết hàng - sử dụng service thay vì truy vấn trực tiếp
+        List<ProductDTO> lowStockProducts = productService.getLowStockProducts(10);
         stats.setLowStockProducts((long) lowStockProducts.size());
 
         // Phân phối trạng thái đơn hàng
@@ -250,7 +252,7 @@ public class DashboardStatsServiceImpl implements DashboardStatsService {
     public Map<String, Object> getTopSellingProducts(LocalDateTime startDate, LocalDateTime endDate, int limit) {
         Map<String, Object> result = new HashMap<>();
 
-        List<Order> orders = orderRepository.findOrdersByDateRange(startDate, endDate);
+        List<Order> orders = orderRepository.findOrdersByDateRangeWithItems(startDate, endDate);
 
         // Lọc đơn hàng hợp lệ
         List<Order> validOrders = orders.stream()
@@ -274,21 +276,29 @@ public class DashboardStatsServiceImpl implements DashboardStatsService {
         }
 
         // Sắp xếp theo số lượng bán và lấy top N sản phẩm
-        List<Map<String, Object>> topProducts = productQuantities.entrySet().stream()
+        List<Integer> topProductIds = productQuantities.entrySet().stream()
                 .sorted(Map.Entry.<Integer, Long>comparingByValue().reversed())
                 .limit(limit)
-                .map(entry -> {
+                .map(Map.Entry::getKey)
+                .collect(Collectors.toList());
+                
+        // Lấy chi tiết sản phẩm với một lần truy vấn
+        List<Product> topProductDetails = productRepository.findByIdInWithVariantsAndImages(topProductIds);
+        Map<Integer, Product> productMap = topProductDetails.stream()
+                .collect(Collectors.toMap(Product::getId, p -> p));
+
+        List<Map<String, Object>> topProducts = topProductIds.stream()
+                .map(productId -> {
                     Map<String, Object> productInfo = new HashMap<>();
-                    Integer productId = entry.getKey();
-                    Product product = productRepository.findById(productId).orElse(null);
+                    Product product = productMap.get(productId);
 
                     if (product != null) {
                         productInfo.put("id", product.getId());
                         productInfo.put("name", product.getName());
-                        productInfo.put("quantity", entry.getValue());
+                        productInfo.put("quantity", productQuantities.get(productId));
                         productInfo.put("revenue", productRevenues.getOrDefault(productId, BigDecimal.ZERO));
                         productInfo.put("category", product.getCategory().getName());
-                        productInfo.put("image", product.getImage());
+                        productInfo.put("image", product.getMainImageUrl());
                     }
 
                     return productInfo;
@@ -398,8 +408,30 @@ public class DashboardStatsServiceImpl implements DashboardStatsService {
     public Map<String, Object> getLowStockProducts(int threshold) {
         Map<String, Object> result = new HashMap<>();
 
-        // Lấy sản phẩm sắp hết hàng
-        List<ProductDTO> lowStockProducts = productService.getLowStockProducts(threshold);
+        // Sử dụng phương thức tối ưu để lấy sản phẩm sắp hết hàng
+        List<Product> lowStockProductsWithDetails = productRepository.findLowStockProductsWithImages(threshold);
+        
+        // Tạo danh sách lowStockProducts từ entity
+        List<ProductDTO> lowStockProducts = new ArrayList<>();
+        for (Product product : lowStockProductsWithDetails) {
+            ProductDTO dto = new ProductDTO();
+            dto.setId(product.getId());
+            dto.setName(product.getName());
+            dto.setCategoryId(product.getCategory().getId());
+            dto.setCategoryName(product.getCategory().getName());
+            
+            // Lấy mainImageUrl từ phương thức getMainImageUrl
+            String mainImageUrl = product.getMainImageUrl();
+            List<String> images = new ArrayList<>();
+            images.add(mainImageUrl);
+            dto.setImages(images);
+            
+            dto.setTotalStockQuantity(product.getTotalStockQuantity());
+            dto.setBasePrice(product.getBasePrice());
+            dto.setStatus(product.getStatus().toString());
+            // Thêm các field cần thiết khác
+            lowStockProducts.add(dto);
+        }
 
         result.put("threshold", threshold);
         result.put("lowStockProducts", lowStockProducts);
@@ -415,5 +447,10 @@ public class DashboardStatsServiceImpl implements DashboardStatsService {
         result.put("lowStockByCategory", lowStockByCategory);
 
         return result;
+    }
+
+    private Map<String, Object> getTopSellingCategories(LocalDateTime startDate, LocalDateTime endDate, int limit) {
+        // Implementation depends on your business requirements
+        return null;
     }
 }

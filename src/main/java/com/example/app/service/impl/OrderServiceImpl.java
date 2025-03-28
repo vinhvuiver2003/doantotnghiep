@@ -6,6 +6,17 @@ import com.example.app.dto.OrderItemDTO;
 import com.example.app.dto.PagedResponse;
 import com.example.app.dto.PaymentDTO;
 import com.example.app.entity.*;
+import com.example.app.entity.Cart;
+import com.example.app.entity.CartItem;
+import com.example.app.entity.Delivery;
+import com.example.app.entity.Order;
+import com.example.app.entity.OrderItem;
+import com.example.app.entity.Payment;
+import com.example.app.entity.Product;
+import com.example.app.entity.ProductImage;
+import com.example.app.entity.ProductVariant;
+import com.example.app.entity.Promotion;
+import com.example.app.entity.User;
 import com.example.app.exception.ResourceNotFoundException;
 import com.example.app.repository.*;
 import com.example.app.service.EmailService;
@@ -98,7 +109,7 @@ public class OrderServiceImpl implements OrderService {
 
     @Override
     public OrderDTO getOrderById(Integer id) {
-        Order order = orderRepository.findById(id)
+        Order order = orderRepository.findByIdWithDetails(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Order not found with id: " + id));
 
         return convertToDTO(order);
@@ -112,7 +123,7 @@ public class OrderServiceImpl implements OrderService {
         }
 
         Pageable pageable = PageRequest.of(page, size, Sort.by("createdAt").descending());
-        Page<Order> orders = orderRepository.findByUserId(userId, pageable);
+        Page<Order> orders = orderRepository.findByUserIdWithDetails(userId, pageable);
 
         List<OrderDTO> content = orders.getContent().stream()
                 .map(this::convertToDTO)
@@ -165,7 +176,7 @@ public class OrderServiceImpl implements OrderService {
         // Sử dụng pessimistic lock để khóa bản ghi giỏ hàng
         Cart cart;
         try {
-            cart = cartRepository.findByIdWithItemsForUpdate(cartId)
+            cart = cartRepository.findByIdWithItemsAndProductsForUpdate(cartId)
                     .orElseThrow(() -> new ResourceNotFoundException("Cart not found with id: " + cartId));
         } catch (Exception e) {
             throw new IllegalStateException("Giỏ hàng đang được xử lý bởi một giao dịch khác, vui lòng thử lại sau.");
@@ -288,12 +299,6 @@ public class OrderServiceImpl implements OrderService {
 
             orderItemRepository.save(orderItem);
 
-            // Update product stock
-            Product product = cartItem.getProduct();
-            int remainingStock = product.getStockQuantity() - cartItem.getQuantity();
-            product.setStockQuantity(Math.max(0, remainingStock));
-            productRepository.save(product);
-
             // Update variant stock
             ProductVariant variant = cartItem.getVariant();
             int remainingVariantStock = variant.getStockQuantity() - cartItem.getQuantity();
@@ -379,11 +384,6 @@ public class OrderServiceImpl implements OrderService {
                 // If order is cancelled, restore stock
                 List<OrderItem> orderItems = orderItemRepository.findByOrderId(id);
                 for (OrderItem item : orderItems) {
-                    // Restore product stock
-                    Product product = item.getProduct();
-                    product.setStockQuantity(product.getStockQuantity() + item.getQuantity());
-                    productRepository.save(product);
-
                     // Restore variant stock
                     ProductVariant variant = item.getVariant();
                     variant.setStockQuantity(variant.getStockQuantity() + item.getQuantity());
@@ -415,7 +415,7 @@ public class OrderServiceImpl implements OrderService {
 
     @Override
     public List<OrderDTO> getOrdersByStatus(Order.OrderStatus status) {
-        List<Order> orders = orderRepository.findByOrderStatus(status);
+        List<Order> orders = orderRepository.findByOrderStatusWithDetails(status);
 
         return orders.stream()
                 .map(this::convertToDTO)
@@ -485,7 +485,7 @@ public class OrderServiceImpl implements OrderService {
                 if (item.getProduct() != null) {
                     itemDTO.setProductId(item.getProduct().getId());
                     itemDTO.setProductName(item.getProduct().getName());
-                    itemDTO.setProductImage(item.getProduct().getImage());
+                    itemDTO.setProductImage(item.getProduct().getMainImageUrl());
                 }
                 
                 // Chỉ lấy thông tin cần thiết từ variant để tránh vòng lặp sâu
@@ -857,12 +857,9 @@ public class OrderServiceImpl implements OrderService {
 
         // Khôi phục số lượng sản phẩm trong kho
         for (OrderItem item : order.getItems()) {
-            // Khôi phục product stock
-            Product product = item.getProduct();
-            product.setStockQuantity(product.getStockQuantity() + item.getQuantity());
-            productRepository.save(product);
-
-            // Khôi phục variant stock
+            // Không cần khôi phục tồn kho ở mức product nữa
+            
+            // Restore variant stock
             ProductVariant variant = item.getVariant();
             variant.setStockQuantity(variant.getStockQuantity() + item.getQuantity());
             if (variant.getStatus() == ProductVariant.VariantStatus.out_of_stock && variant.getStockQuantity() > 0) {

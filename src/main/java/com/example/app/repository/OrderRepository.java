@@ -11,6 +11,7 @@ import org.springframework.stereotype.Repository;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
 
 @Repository
 public interface OrderRepository extends JpaRepository<Order, Integer> {
@@ -33,4 +34,39 @@ public interface OrderRepository extends JpaRepository<Order, Integer> {
 
     @Query("SELECT COUNT(o) FROM Order o WHERE o.user.id = :userId AND o.orderStatus = 'delivered'")
     Long countCompletedOrdersByUser(@Param("userId") Integer userId);
+
+    @Query("SELECT DISTINCT o FROM Order o " +
+           "LEFT JOIN FETCH o.items i " +
+           "LEFT JOIN FETCH i.product p " +
+           "LEFT JOIN FETCH i.variant v " +
+           "LEFT JOIN FETCH p.defaultVariant dv " +
+           "LEFT JOIN FETCH dv.images " +
+           "LEFT JOIN FETCH p.images " +
+           "WHERE o.id = :orderId")
+    Optional<Order> findByIdWithDetails(@Param("orderId") Integer orderId);
+
+    @Query("SELECT DISTINCT o FROM Order o " +
+           "LEFT JOIN FETCH o.items i " +
+           "LEFT JOIN FETCH i.product p " +
+           "LEFT JOIN FETCH i.variant " +
+           "LEFT JOIN FETCH o.delivery " +
+           "LEFT JOIN FETCH o.payment " +
+           "WHERE o.user.id = :userId")
+    Page<Order> findByUserIdWithDetails(@Param("userId") Integer userId, Pageable pageable);
+
+    @Query("SELECT DISTINCT o FROM Order o " +
+           "LEFT JOIN FETCH o.items i " +
+           "LEFT JOIN FETCH i.product p " +
+           "LEFT JOIN FETCH i.variant " +
+           "WHERE o.createdAt BETWEEN :startDate AND :endDate")
+    List<Order> findOrdersByDateRangeWithItems(
+            @Param("startDate") LocalDateTime startDate,
+            @Param("endDate") LocalDateTime endDate);
+
+    @Query("SELECT DISTINCT o FROM Order o " +
+           "LEFT JOIN FETCH o.items " +
+           "LEFT JOIN FETCH o.delivery " +
+           "LEFT JOIN FETCH o.payment " +
+           "WHERE o.orderStatus = :status")
+    List<Order> findByOrderStatusWithDetails(@Param("status") Order.OrderStatus status);
 }

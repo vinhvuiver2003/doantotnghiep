@@ -1,6 +1,5 @@
 package com.example.app.dto;
 
-
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -15,6 +14,8 @@ public class ProductImageDTO {
     private Integer productId;
     private Integer variantId;
     private String imageURL;
+    private Boolean isPrimary;
     private Integer sortOrder;
+    private String altText;
     private LocalDateTime createdAt;
 }

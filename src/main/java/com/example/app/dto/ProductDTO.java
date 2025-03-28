@@ -21,13 +21,14 @@ public class ProductDTO {
     private String categoryName;
     private Integer brandId;
     private String brandName;
-    private Integer stockQuantity;
-    private String image;
+    private String productType;
     private String status;
+    private Integer defaultVariantId;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
     private List<ProductVariantDTO> variants;
     private List<String> images;
+    private Integer totalStockQuantity;
     private Double averageRating;
     private Long reviewCount;
 }

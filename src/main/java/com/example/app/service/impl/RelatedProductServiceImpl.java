@@ -2,6 +2,8 @@ package com.example.app.service.impl;
 
 import com.example.app.dto.RelatedProductDTO;
 import com.example.app.entity.Product;
+import com.example.app.entity.ProductImage;
+import com.example.app.entity.ProductVariant;
 import com.example.app.entity.RelatedProduct;
 import com.example.app.entity.RelatedProductId;
 import com.example.app.exception.ResourceNotFoundException;
@@ -223,12 +225,12 @@ public class RelatedProductServiceImpl implements RelatedProductService {
         RelatedProductDTO dto = new RelatedProductDTO();
         dto.setProductId(product.getId());
         dto.setProductName(product.getName());
-        dto.setProductImage(product.getImage());
+        dto.setProductImage(product.getMainImageUrl());
         dto.setProductPrice(product.getBasePrice());
 
         dto.setRelatedProductId(relatedProduct.getId());
         dto.setRelatedProductName(relatedProduct.getName());
-        dto.setRelatedProductImage(relatedProduct.getImage());
+        dto.setRelatedProductImage(relatedProduct.getMainImageUrl());
         dto.setRelatedProductPrice(relatedProduct.getBasePrice());
 
         // Xác định loại quan hệ gợi ý dựa trên thuộc tính sản phẩm
@@ -252,12 +254,12 @@ public class RelatedProductServiceImpl implements RelatedProductService {
 
         dto.setProductId(product.getId());
         dto.setProductName(product.getName());
-        dto.setProductImage(product.getImage());
+        dto.setProductImage(product.getMainImageUrl());
         dto.setProductPrice(product.getBasePrice());
 
         dto.setRelatedProductId(related.getId());
         dto.setRelatedProductName(related.getName());
-        dto.setRelatedProductImage(related.getImage());
+        dto.setRelatedProductImage(related.getMainImageUrl());
         dto.setRelatedProductPrice(related.getBasePrice());
 
         dto.setRelationType(relatedProduct.getRelationType().name());

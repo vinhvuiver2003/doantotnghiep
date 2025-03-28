@@ -15,10 +15,12 @@ public class ProductVariantDTO {
     private Integer productId;
     private String color;
     private String size;
+    private String sizeType; // clothing_size, shoe_size, numeric_size, one_size
     private Integer stockQuantity;
     private BigDecimal priceAdjustment;
     private BigDecimal finalPrice; // basePrice + priceAdjustment
-    private String image;
+    private String sku; // Thêm: Stock Keeping Unit
     private String status;
-    private List<String> images;
+    private List<ProductImageDTO> images; // Thay đổi: danh sách đầy đủ các ảnh, không chỉ URLs
+    private Boolean isPrimary; // Thêm: biến thể này có phải là mặc định không
 }

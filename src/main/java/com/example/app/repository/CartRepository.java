@@ -28,4 +28,43 @@ public interface CartRepository extends JpaRepository<Cart, Integer> {
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT c FROM Cart c LEFT JOIN FETCH c.items WHERE c.id = :cartId")
     Optional<Cart> findByIdWithItemsForUpdate(@Param("cartId") Integer cartId);
+    
+    // Phương thức tối ưu với fetch join đầy đủ
+    @Query("SELECT DISTINCT c FROM Cart c " +
+           "LEFT JOIN FETCH c.items i " +
+           "LEFT JOIN FETCH i.product p " +
+           "LEFT JOIN FETCH i.variant v " +
+           "LEFT JOIN FETCH p.defaultVariant dv " +
+           "LEFT JOIN FETCH dv.images " +
+           "LEFT JOIN FETCH p.images " +
+           "WHERE c.id = :cartId")
+    Optional<Cart> findByIdWithFullDetails(@Param("cartId") Integer cartId);
+    
+    @Query("SELECT DISTINCT c FROM Cart c " +
+           "LEFT JOIN FETCH c.items i " +
+           "LEFT JOIN FETCH i.product p " +
+           "LEFT JOIN FETCH i.variant v " +
+           "LEFT JOIN FETCH p.defaultVariant dv " +
+           "LEFT JOIN FETCH dv.images " +
+           "LEFT JOIN FETCH p.images " +
+           "WHERE c.user.id = :userId")
+    Optional<Cart> findByUserIdWithFullDetails(@Param("userId") Integer userId);
+    
+    @Query("SELECT DISTINCT c FROM Cart c " +
+           "LEFT JOIN FETCH c.items i " +
+           "LEFT JOIN FETCH i.product p " +
+           "LEFT JOIN FETCH i.variant v " +
+           "LEFT JOIN FETCH p.defaultVariant dv " +
+           "LEFT JOIN FETCH dv.images " +
+           "LEFT JOIN FETCH p.images " +
+           "WHERE c.sessionId = :sessionId")
+    Optional<Cart> findBySessionIdWithFullDetails(@Param("sessionId") String sessionId);
+    
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT c FROM Cart c " +
+           "LEFT JOIN FETCH c.items i " +
+           "LEFT JOIN FETCH i.product p " +
+           "LEFT JOIN FETCH i.variant v " +
+           "WHERE c.id = :cartId")
+    Optional<Cart> findByIdWithItemsAndProductsForUpdate(@Param("cartId") Integer cartId);
 }

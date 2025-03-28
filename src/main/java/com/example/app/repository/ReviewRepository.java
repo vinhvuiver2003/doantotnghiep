@@ -18,6 +18,9 @@ public interface ReviewRepository extends JpaRepository<Review, Integer> {
     @Query("SELECT AVG(r.rating) FROM Review r WHERE r.product.id = :productId")
     Double calculateAverageRating(@Param("productId") Integer productId);
 
+    @Query("SELECT AVG(r.rating) FROM Review r WHERE r.product.id = :productId")
+    Double findAverageRatingByProductId(@Param("productId") Integer productId);
+
     @Query("SELECT COUNT(r) FROM Review r WHERE r.product.id = :productId AND r.rating >= :minRating")
     Long countPositiveReviews(@Param("productId") Integer productId, @Param("minRating") Integer minRating);
 

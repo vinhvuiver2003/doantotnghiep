@@ -1,6 +1,8 @@
 package com.example.app.service.impl;
+import com.example.app.dto.ProductImageDTO;
 import com.example.app.dto.ProductVariantDTO;
 import com.example.app.entity.Product;
+import com.example.app.entity.ProductImage;
 import com.example.app.entity.ProductVariant;
 import com.example.app.exception.ResourceNotFoundException;
 import com.example.app.repository.ProductRepository;
@@ -11,7 +13,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 @Service
@@ -83,7 +87,20 @@ public class ProductVariantServiceImpl implements ProductVariantService {
         variant.setSize(variantDTO.getSize());
         variant.setStockQuantity(variantDTO.getStockQuantity());
         variant.setPriceAdjustment(variantDTO.getPriceAdjustment());
-        variant.setImage(variantDTO.getImage());
+        
+        // Thêm mới: sizeType và sku
+        if (variantDTO.getSizeType() != null) {
+            variant.setSizeType(ProductVariant.SizeType.valueOf(variantDTO.getSizeType()));
+        } else {
+            // Mặc định dựa theo loại sản phẩm
+            if (product.getProductType() == Product.ProductType.footwear) {
+                variant.setSizeType(ProductVariant.SizeType.shoe_size);
+            } else {
+                variant.setSizeType(ProductVariant.SizeType.clothing_size);
+            }
+        }
+        
+        variant.setSku(variantDTO.getSku());
 
         // Đặt trạng thái dựa trên tồn kho
         if (variantDTO.getStockQuantity() <= 0) {
@@ -122,8 +139,14 @@ public class ProductVariantServiceImpl implements ProductVariantService {
         variant.setStockQuantity(variantDTO.getStockQuantity());
         variant.setPriceAdjustment(variantDTO.getPriceAdjustment());
 
-        if (variantDTO.getImage() != null) {
-            variant.setImage(variantDTO.getImage());
+        // Cập nhật sizeType nếu được cung cấp
+        if (variantDTO.getSizeType() != null) {
+            variant.setSizeType(ProductVariant.SizeType.valueOf(variantDTO.getSizeType()));
+        }
+        
+        // Cập nhật SKU nếu được cung cấp
+        if (variantDTO.getSku() != null) {
+            variant.setSku(variantDTO.getSku());
         }
 
         // Cập nhật trạng thái dựa trên tồn kho
@@ -212,17 +235,41 @@ public class ProductVariantServiceImpl implements ProductVariantService {
         dto.setProductId(variant.getProduct().getId());
         dto.setColor(variant.getColor());
         dto.setSize(variant.getSize());
+        dto.setSizeType(variant.getSizeType().name());
         dto.setStockQuantity(variant.getStockQuantity());
         dto.setPriceAdjustment(variant.getPriceAdjustment());
+        dto.setSku(variant.getSku());
 
         // Tính giá cuối cùng = giá cơ bản + phụ thu
         BigDecimal finalPrice = variant.getProduct().getBasePrice().add(variant.getPriceAdjustment());
         dto.setFinalPrice(finalPrice);
 
-        dto.setImage(variant.getImage());
         dto.setStatus(variant.getStatus().name());
-
-        // Những thông tin liên quan khác như danh sách hình ảnh biến thể có thể được thêm ở đây
+        
+        // Kiểm tra nếu variant này là defaultVariant
+        Product product = variant.getProduct();
+        if (product.getDefaultVariant() != null && product.getDefaultVariant().getId().equals(variant.getId())) {
+            dto.setIsPrimary(true);
+        } else {
+            dto.setIsPrimary(false);
+        }
+        
+        // Lấy ảnh của variant
+        if (variant.getImages() != null && !variant.getImages().isEmpty()) {
+            List<ProductImageDTO> imageDTOs = new ArrayList<>();
+            for (ProductImage image : variant.getImages()) {
+                ProductImageDTO imageDTO = new ProductImageDTO();
+                imageDTO.setId(image.getId());
+                imageDTO.setImageURL(image.getImageURL());
+                imageDTO.setIsPrimary(image.getIsPrimary());
+                imageDTO.setSortOrder(image.getSortOrder());
+                imageDTO.setAltText(image.getAltText());
+                imageDTOs.add(imageDTO);
+            }
+            dto.setImages(imageDTOs);
+        } else {
+            dto.setImages(new ArrayList<>());
+        }
 
         return dto;
     }
