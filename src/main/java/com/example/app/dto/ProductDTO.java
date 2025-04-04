@@ -32,4 +32,5 @@ public class ProductDTO {
     private Double averageRating;
     private Long reviewCount;
     private List<ReviewDTO> reviews;
+    private List<RelatedProductDTO> relatedProducts;
 }

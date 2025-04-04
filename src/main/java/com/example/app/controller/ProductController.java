@@ -236,4 +236,12 @@ public class ProductController {
                     .body(ApiResponse.error("Error deleting product: " + e.getMessage()));
         }
     }
+
+    @GetMapping("/random")
+    public ResponseEntity<List<ProductDTO>> getRandomProducts(
+        @RequestParam(defaultValue = "4") int limit
+    ) {
+        List<ProductDTO> randomProducts = productService.getRandomProducts(limit);
+        return ResponseEntity.ok(randomProducts);
+    }
 }

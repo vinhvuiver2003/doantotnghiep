@@ -24,6 +24,8 @@ public interface ProductService {
 
     List<ProductDTO> getLowStockProducts(int threshold);
 
+    List<ProductDTO> getRandomProducts(int limit);
+
     ProductDTO createProduct(ProductDTO productDTO);
 
     ProductDTO updateProduct(Integer id, ProductDTO productDTO);

@@ -71,4 +71,7 @@ public interface ProductRepository extends JpaRepository<Product, Integer> {
            "LEFT JOIN FETCH v.images " +
            "WHERE p.id IN :productIds")
     List<Product> findByIdInWithVariantsAndImages(@Param("productIds") List<Integer> productIds);
+
+    @Query("SELECT p.id FROM Product p")
+    List<Integer> findAllProductIds();
 }

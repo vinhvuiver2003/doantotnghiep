@@ -3,11 +3,13 @@ import com.example.app.dto.PagedResponse;
 import com.example.app.dto.ProductDTO;
 import com.example.app.dto.ProductImageDTO;
 import com.example.app.dto.ProductVariantDTO;
+import com.example.app.dto.RelatedProductDTO;
 import com.example.app.dto.ReviewDTO;
 import com.example.app.entity.*;
 import com.example.app.exception.ResourceNotFoundException;
 import com.example.app.repository.*;
 import com.example.app.service.ProductService;
+import com.example.app.service.RelatedProductService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -18,6 +20,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -31,6 +34,7 @@ public class ProductServiceImpl implements ProductService {
     private final ProductVariantRepository variantRepository;
     private final ProductImageRepository productImageRepository;
     private final ReviewRepository reviewRepository;
+    private final RelatedProductService relatedProductService;
 
     @Autowired
     public ProductServiceImpl(
@@ -39,13 +43,15 @@ public class ProductServiceImpl implements ProductService {
             BrandRepository brandRepository,
             ProductVariantRepository variantRepository,
             ProductImageRepository productImageRepository,
-            ReviewRepository reviewRepository) {
+            ReviewRepository reviewRepository,
+            RelatedProductService relatedProductService) {
         this.productRepository = productRepository;
         this.categoryRepository = categoryRepository;
         this.brandRepository = brandRepository;
         this.variantRepository = variantRepository;
         this.productImageRepository = productImageRepository;
         this.reviewRepository = reviewRepository;
+        this.relatedProductService = relatedProductService;
     }
 
     @Override
@@ -615,6 +621,32 @@ public class ProductServiceImpl implements ProductService {
         return productRepository.count();
     }
 
+    @Override
+    public List<ProductDTO> getRandomProducts(int limit) {
+        // Lấy tất cả ID sản phẩm
+        List<Integer> allProductIds = productRepository.findAllProductIds();
+        
+        if (allProductIds.isEmpty()) {
+            return new ArrayList<>();
+        }
+        
+        // Xáo trộn danh sách ID
+        Collections.shuffle(allProductIds);
+        
+        // Lấy số lượng ID theo limit
+        int size = Math.min(limit, allProductIds.size());
+        List<Integer> randomIds = allProductIds.subList(0, size);
+        
+        // Lấy thông tin chi tiết của các sản phẩm
+        List<Product> randomProducts = productRepository.findByIdInWithVariantsAndImages(randomIds);
+        
+        // Chuyển đổi sang DTO
+        return randomProducts.stream()
+            .map(this::convertToDTOSafe)
+            .filter(dto -> dto != null)
+            .collect(Collectors.toList());
+    }
+
     // Helper method for safe conversion
     private ProductDTO convertToDTOSafe(Product product) {
         try {
@@ -747,6 +779,15 @@ public class ProductServiceImpl implements ProductService {
                 dto.setAverageRating(0.0);
                 dto.setReviewCount(0L);
                 dto.setReviews(new ArrayList<>());
+            }
+            
+            // Lấy sản phẩm liên quan
+            try {
+                List<RelatedProductDTO> relatedProducts = relatedProductService.getRelatedProducts(product.getId());
+                dto.setRelatedProducts(relatedProducts);
+            } catch (Exception e) {
+                System.err.println("Error getting related products for product ID " + product.getId() + ": " + e.getMessage());
+                dto.setRelatedProducts(new ArrayList<>());
             }
             
             return dto;
