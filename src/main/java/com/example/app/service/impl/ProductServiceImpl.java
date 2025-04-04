@@ -3,6 +3,7 @@ import com.example.app.dto.PagedResponse;
 import com.example.app.dto.ProductDTO;
 import com.example.app.dto.ProductImageDTO;
 import com.example.app.dto.ProductVariantDTO;
+import com.example.app.dto.ReviewDTO;
 import com.example.app.entity.*;
 import com.example.app.exception.ResourceNotFoundException;
 import com.example.app.repository.*;
@@ -55,9 +56,12 @@ public class ProductServiceImpl implements ProductService {
 
             // Thay đổi cách truy vấn để sử dụng cách lấy dữ liệu tối ưu hơn
             Page<Product> products;
-            if (sortBy.equals("id") || sortBy.equals("name") || sortBy.equals("basePrice")) {
+            if (sortBy.equals("id") || sortBy.equals("name") || sortBy.equals("basePrice") || sortBy.equals("averageRating")) {
                 // Lấy danh sách IDs từ query phân trang
-                List<Integer> productIds = productRepository.findAll(pageable)
+                List<Integer> productIds;
+                
+                // Xử lý đặc biệt cho sắp xếp theo đánh giá trung bình và các trường cơ bản khác
+                productIds = productRepository.findAll(pageable)
                     .stream().map(Product::getId).collect(Collectors.toList());
                 
                 if (productIds.isEmpty()) {
@@ -84,6 +88,17 @@ public class ProductServiceImpl implements ProductService {
                         return sortDir.equalsIgnoreCase("desc") ? 
                             p2.getName().compareTo(p1.getName()) : 
                             p1.getName().compareTo(p2.getName());
+                    } else if (sortBy.equals("averageRating")) {
+                        Double rating1 = reviewRepository.findAverageRatingByProductId(p1.getId());
+                        Double rating2 = reviewRepository.findAverageRatingByProductId(p2.getId());
+                        
+                        // Xử lý null values
+                        rating1 = rating1 != null ? rating1 : 0.0;
+                        rating2 = rating2 != null ? rating2 : 0.0;
+                        
+                        return sortDir.equalsIgnoreCase("desc") ? 
+                            Double.compare(rating2, rating1) : 
+                            Double.compare(rating1, rating2);
                     } else { // basePrice
                         return sortDir.equalsIgnoreCase("desc") ? 
                             p2.getBasePrice().compareTo(p1.getBasePrice()) : 
@@ -170,13 +185,14 @@ public class ProductServiceImpl implements ProductService {
     }
 
     @Override
-    public PagedResponse<ProductDTO> getProductsByCategory(Integer categoryId, int page, int size) {
+    public PagedResponse<ProductDTO> getProductsByCategory(Integer categoryId, int page, int size, String sortBy, String sortDir) {
         // Check if category exists
         if (!categoryRepository.existsById(categoryId)) {
             throw new ResourceNotFoundException("Category not found with id: " + categoryId);
         }
 
-        Pageable pageable = PageRequest.of(page, size);
+        Sort sort = sortDir.equalsIgnoreCase("desc") ? Sort.by(sortBy).descending() : Sort.by(sortBy).ascending();
+        Pageable pageable = PageRequest.of(page, size, sort);
         Page<Product> products = productRepository.findByCategoryId(categoryId, pageable);
 
         List<ProductDTO> content = products.getContent().stream()
@@ -195,13 +211,14 @@ public class ProductServiceImpl implements ProductService {
     }
 
     @Override
-    public PagedResponse<ProductDTO> getProductsByBrand(Integer brandId, int page, int size) {
+    public PagedResponse<ProductDTO> getProductsByBrand(Integer brandId, int page, int size, String sortBy, String sortDir) {
         // Check if brand exists
         if (!brandRepository.existsById(brandId)) {
             throw new ResourceNotFoundException("Brand not found with id: " + brandId);
         }
 
-        Pageable pageable = PageRequest.of(page, size);
+        Sort sort = sortDir.equalsIgnoreCase("desc") ? Sort.by(sortBy).descending() : Sort.by(sortBy).ascending();
+        Pageable pageable = PageRequest.of(page, size, sort);
         Page<Product> products = productRepository.findByBrandId(brandId, pageable);
 
         List<ProductDTO> content = products.getContent().stream()
@@ -220,8 +237,9 @@ public class ProductServiceImpl implements ProductService {
     }
 
     @Override
-    public PagedResponse<ProductDTO> searchProducts(String keyword, int page, int size) {
-        Pageable pageable = PageRequest.of(page, size);
+    public PagedResponse<ProductDTO> searchProducts(String keyword, int page, int size, String sortBy, String sortDir) {
+        Sort sort = sortDir.equalsIgnoreCase("desc") ? Sort.by(sortBy).descending() : Sort.by(sortBy).ascending();
+        Pageable pageable = PageRequest.of(page, size, sort);
         Page<Product> products = productRepository.searchProducts(keyword, pageable);
 
         List<ProductDTO> content = products.getContent().stream()
@@ -240,8 +258,9 @@ public class ProductServiceImpl implements ProductService {
     }
 
     @Override
-    public PagedResponse<ProductDTO> filterProductsByPrice(BigDecimal minPrice, BigDecimal maxPrice, int page, int size) {
-        Pageable pageable = PageRequest.of(page, size);
+    public PagedResponse<ProductDTO> filterProductsByPrice(BigDecimal minPrice, BigDecimal maxPrice, int page, int size, String sortBy, String sortDir) {
+        Sort sort = sortDir.equalsIgnoreCase("desc") ? Sort.by(sortBy).descending() : Sort.by(sortBy).ascending();
+        Pageable pageable = PageRequest.of(page, size, sort);
         Page<Product> products = productRepository.findByBasePriceBetween(minPrice, maxPrice, pageable);
 
         List<ProductDTO> content = products.getContent().stream()
@@ -699,10 +718,35 @@ public class ProductServiceImpl implements ProductService {
                 
                 Long reviewCount = reviewRepository.countByProductId(product.getId());
                 dto.setReviewCount(reviewCount != null ? reviewCount : 0L);
+                
+                // Lấy danh sách đánh giá của sản phẩm
+                Pageable pageable = PageRequest.of(0, 10, Sort.by("createdAt").descending());
+                Page<Review> reviews = reviewRepository.findByProductId(product.getId(), pageable);
+                
+                List<ReviewDTO> reviewDTOs = reviews.getContent().stream()
+                    .map(review -> {
+                        ReviewDTO reviewDTO = new ReviewDTO();
+                        reviewDTO.setId(review.getId());
+                        reviewDTO.setProductId(review.getProduct().getId());
+                        reviewDTO.setProductName(review.getProduct().getName());
+                        reviewDTO.setUserId(review.getUser().getId());
+                        reviewDTO.setUsername(review.getUser().getUsername());
+                        reviewDTO.setRating(review.getRating());
+                        reviewDTO.setTitle(review.getTitle());
+                        reviewDTO.setContent(review.getContent());
+                        reviewDTO.setComment(review.getComment());
+                        reviewDTO.setCreatedAt(review.getCreatedAt());
+                        reviewDTO.setUpdatedAt(review.getUpdatedAt());
+                        return reviewDTO;
+                    })
+                    .collect(Collectors.toList());
+                
+                dto.setReviews(reviewDTOs);
             } catch (Exception e) {
                 System.err.println("Error getting review stats for product ID " + product.getId() + ": " + e.getMessage());
                 dto.setAverageRating(0.0);
                 dto.setReviewCount(0L);
+                dto.setReviews(new ArrayList<>());
             }
             
             return dto;

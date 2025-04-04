@@ -127,13 +127,22 @@ public class UserServiceImpl implements UserService {
                 .orElseThrow(() -> new ResourceNotFoundException("User not found with id: " + id));
 
         // Update fields that are allowed to be changed
-        user.setFirstName(userDTO.getFirstName());
-        user.setLastName(userDTO.getLastName());
+        if (userDTO.getFirstName() != null) {
+            user.setFirstName(userDTO.getFirstName());
+        }
+        
+        if (userDTO.getLastName() != null) {
+            user.setLastName(userDTO.getLastName());
+        }
+        
+        // Phone có thể null hoặc chuỗi rỗng
         user.setPhone(userDTO.getPhone());
+        
+        // Address có thể null hoặc chuỗi rỗng
         user.setAddress(userDTO.getAddress());
 
         // Email update requires checking for existing email
-        if (!user.getEmail().equals(userDTO.getEmail())) {
+        if (userDTO.getEmail() != null && !userDTO.getEmail().equals(user.getEmail())) {
             if (userRepository.existsByEmail(userDTO.getEmail())) {
                 throw new IllegalArgumentException("Email already exists");
             }

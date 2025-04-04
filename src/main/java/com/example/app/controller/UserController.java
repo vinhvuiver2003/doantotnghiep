@@ -85,6 +85,21 @@ public class UserController {
     }
 
     /**
+     * Cập nhật thông tin người dùng hiện tại
+     */
+    @PutMapping("/profile")
+    public ResponseEntity<ApiResponse<UserDTO>> updateCurrentUserProfile(
+            @Valid @RequestBody UserDTO userDTO) {
+
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        String username = authentication.getName();
+        UserDTO currentUser = userService.getUserByUsername(username);
+        
+        UserDTO updatedUser = userService.updateUser(currentUser.getId(), userDTO);
+        return ResponseEntity.ok(ApiResponse.success("Profile updated successfully", updatedUser));
+    }
+
+    /**
      * Đổi mật khẩu (chỉ cho người dùng hiện tại)
      */
     @PostMapping("/change-password")

@@ -2,6 +2,7 @@ package com.example.app.repository;
 
 
 import com.example.app.entity.Cart;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
@@ -15,7 +16,8 @@ import java.util.Optional;
 
 @Repository
 public interface CartRepository extends JpaRepository<Cart, Integer> {
-    Optional<Cart> findByUserId(Integer userId);
+    @Query("SELECT c FROM Cart c WHERE c.user.id = :userId ORDER BY c.updatedAt DESC")
+    List<Cart> findByUserIdOrderByUpdatedAtDesc(@Param("userId") Integer userId, Pageable pageable);
 
     Optional<Cart> findBySessionId(String sessionId);
 
@@ -40,15 +42,16 @@ public interface CartRepository extends JpaRepository<Cart, Integer> {
            "WHERE c.id = :cartId")
     Optional<Cart> findByIdWithFullDetails(@Param("cartId") Integer cartId);
     
-    @Query("SELECT DISTINCT c FROM Cart c " +
+    @Query(value = "SELECT DISTINCT c FROM Cart c " +
            "LEFT JOIN FETCH c.items i " +
            "LEFT JOIN FETCH i.product p " +
            "LEFT JOIN FETCH i.variant v " +
            "LEFT JOIN FETCH p.defaultVariant dv " +
            "LEFT JOIN FETCH dv.images " +
            "LEFT JOIN FETCH p.images " +
-           "WHERE c.user.id = :userId")
-    Optional<Cart> findByUserIdWithFullDetails(@Param("userId") Integer userId);
+           "WHERE c.user.id = :userId " +
+           "ORDER BY c.updatedAt DESC")
+    List<Cart> findByUserIdWithFullDetailsOrderByUpdatedAtDesc(@Param("userId") Integer userId, Pageable pageable);
     
     @Query("SELECT DISTINCT c FROM Cart c " +
            "LEFT JOIN FETCH c.items i " +

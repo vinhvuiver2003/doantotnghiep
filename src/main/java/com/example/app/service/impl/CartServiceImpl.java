@@ -63,11 +63,13 @@ public class CartServiceImpl implements CartService {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found with id: " + userId));
 
-        // Find user's cart or create a new one
-        Optional<Cart> optionalCart = cartRepository.findByUserIdWithFullDetails(userId);
+        // Find user's cart or create a new one - chỉ lấy giỏ hàng mới nhất
+        org.springframework.data.domain.PageRequest pageRequest = 
+            org.springframework.data.domain.PageRequest.of(0, 1);
+        List<Cart> userCarts = cartRepository.findByUserIdOrderByUpdatedAtDesc(userId, pageRequest);
 
-        if (optionalCart.isPresent()) {
-            Cart cart = optionalCart.get();
+        if (!userCarts.isEmpty()) {
+            Cart cart = userCarts.get(0);
             // Kiểm tra nếu giỏ hàng đã được thanh toán, tạo giỏ hàng mới
             if (cart.getIsCheckedOut()) {
                 return createCart(userId, null);
@@ -277,11 +279,13 @@ public class CartServiceImpl implements CartService {
         }
 
         // Find or create user cart
-        Optional<Cart> optionalUserCart = cartRepository.findByUserId(userId);
+        org.springframework.data.domain.PageRequest pageRequest = 
+            org.springframework.data.domain.PageRequest.of(0, 1);
+        List<Cart> userCarts = cartRepository.findByUserIdOrderByUpdatedAtDesc(userId, pageRequest);
         Cart userCart;
 
-        if (optionalUserCart.isPresent()) {
-            userCart = optionalUserCart.get();
+        if (!userCarts.isEmpty()) {
+            userCart = userCarts.get(0);
             // Kiểm tra nếu giỏ hàng người dùng đã thanh toán, tạo giỏ hàng mới
             if (userCart.getIsCheckedOut()) {
                 User user = userRepository.findById(userId)
@@ -347,11 +351,13 @@ public class CartServiceImpl implements CartService {
         User user = userRepository.findByUsername(username)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found with username: " + username));
 
-        // Tìm giỏ hàng của user hoặc tạo mới
-        Optional<Cart> optionalCart = cartRepository.findByUserId(user.getId());
+        // Tìm giỏ hàng của user hoặc tạo mới - chỉ lấy giỏ hàng mới nhất
+        org.springframework.data.domain.PageRequest pageRequest = 
+            org.springframework.data.domain.PageRequest.of(0, 1);
+        List<Cart> userCarts = cartRepository.findByUserIdOrderByUpdatedAtDesc(user.getId(), pageRequest);
 
-        if (optionalCart.isPresent()) {
-            Cart cart = optionalCart.get();
+        if (!userCarts.isEmpty()) {
+            Cart cart = userCarts.get(0);
             // Kiểm tra nếu giỏ hàng đã được thanh toán, tạo giỏ hàng mới
             if (cart.getIsCheckedOut()) {
                 return createCart(user.getId(), null);
@@ -384,11 +390,13 @@ public class CartServiceImpl implements CartService {
         }
 
         // Tìm hoặc tạo giỏ hàng người dùng
-        Optional<Cart> optionalUserCart = cartRepository.findByUserId(user.getId());
+        org.springframework.data.domain.PageRequest pageRequest = 
+            org.springframework.data.domain.PageRequest.of(0, 1);
+        List<Cart> userCarts = cartRepository.findByUserIdOrderByUpdatedAtDesc(user.getId(), pageRequest);
         Cart userCart;
 
-        if (optionalUserCart.isPresent()) {
-            userCart = optionalUserCart.get();
+        if (!userCarts.isEmpty()) {
+            userCart = userCarts.get(0);
             // Kiểm tra nếu giỏ hàng người dùng đã thanh toán, tạo giỏ hàng mới
             if (userCart.getIsCheckedOut()) {
                 userCart = new Cart();

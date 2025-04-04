@@ -64,10 +64,12 @@ public class ProductController {
     public ResponseEntity<?> getProductsByCategory(
             @PathVariable Integer categoryId,
             @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "12") int size) {
+            @RequestParam(defaultValue = "12") int size,
+            @RequestParam(defaultValue = "id") String sortBy,
+            @RequestParam(defaultValue = "desc") String sortDir) {
 
         try {
-            PagedResponse<ProductDTO> products = productService.getProductsByCategory(categoryId, page, size);
+            PagedResponse<ProductDTO> products = productService.getProductsByCategory(categoryId, page, size, sortBy, sortDir);
             return ResponseEntity.ok(ApiResponse.success("Products by category retrieved successfully", products));
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
@@ -82,10 +84,12 @@ public class ProductController {
     public ResponseEntity<?> getProductsByBrand(
             @PathVariable Integer brandId,
             @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "12") int size) {
+            @RequestParam(defaultValue = "12") int size,
+            @RequestParam(defaultValue = "id") String sortBy,
+            @RequestParam(defaultValue = "desc") String sortDir) {
 
         try {
-            PagedResponse<ProductDTO> products = productService.getProductsByBrand(brandId, page, size);
+            PagedResponse<ProductDTO> products = productService.getProductsByBrand(brandId, page, size, sortBy, sortDir);
             return ResponseEntity.ok(ApiResponse.success("Products by brand retrieved successfully", products));
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
@@ -100,10 +104,12 @@ public class ProductController {
     public ResponseEntity<?> searchProducts(
             @RequestParam String keyword,
             @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "12") int size) {
+            @RequestParam(defaultValue = "12") int size,
+            @RequestParam(defaultValue = "id") String sortBy,
+            @RequestParam(defaultValue = "desc") String sortDir) {
 
         try {
-            PagedResponse<ProductDTO> products = productService.searchProducts(keyword, page, size);
+            PagedResponse<ProductDTO> products = productService.searchProducts(keyword, page, size, sortBy, sortDir);
             return ResponseEntity.ok(ApiResponse.success("Search results", products));
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
@@ -119,10 +125,12 @@ public class ProductController {
             @RequestParam BigDecimal minPrice,
             @RequestParam BigDecimal maxPrice,
             @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "12") int size) {
+            @RequestParam(defaultValue = "12") int size,
+            @RequestParam(defaultValue = "id") String sortBy,
+            @RequestParam(defaultValue = "desc") String sortDir) {
 
         try {
-            PagedResponse<ProductDTO> products = productService.filterProductsByPrice(minPrice, maxPrice, page, size);
+            PagedResponse<ProductDTO> products = productService.filterProductsByPrice(minPrice, maxPrice, page, size, sortBy, sortDir);
             return ResponseEntity.ok(ApiResponse.success("Price filtered results", products));
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)

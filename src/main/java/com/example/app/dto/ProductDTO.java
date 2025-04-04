@@ -31,4 +31,5 @@ public class ProductDTO {
     private Integer totalStockQuantity;
     private Double averageRating;
     private Long reviewCount;
+    private List<ReviewDTO> reviews;
 }

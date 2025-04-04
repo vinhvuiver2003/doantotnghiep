@@ -10,13 +10,13 @@ public interface ProductService {
 
     ProductDTO getProductById(Integer id);
 
-    PagedResponse<ProductDTO> getProductsByCategory(Integer categoryId, int page, int size);
+    PagedResponse<ProductDTO> getProductsByCategory(Integer categoryId, int page, int size, String sortBy, String sortDir);
 
-    PagedResponse<ProductDTO> getProductsByBrand(Integer brandId, int page, int size);
+    PagedResponse<ProductDTO> getProductsByBrand(Integer brandId, int page, int size, String sortBy, String sortDir);
 
-    PagedResponse<ProductDTO> searchProducts(String keyword, int page, int size);
+    PagedResponse<ProductDTO> searchProducts(String keyword, int page, int size, String sortBy, String sortDir);
 
-    PagedResponse<ProductDTO> filterProductsByPrice(BigDecimal minPrice, BigDecimal maxPrice, int page, int size);
+    PagedResponse<ProductDTO> filterProductsByPrice(BigDecimal minPrice, BigDecimal maxPrice, int page, int size, String sortBy, String sortDir);
 
     List<ProductDTO> getNewArrivals(int limit);
 

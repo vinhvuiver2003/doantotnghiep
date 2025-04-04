@@ -93,38 +93,31 @@ public class ReviewServiceImpl implements ReviewService {
     @Override
     @Transactional
     public ReviewDTO createReview(ReviewDTO reviewDTO) {
-        // Check if product exists
+        // Kiểm tra product
         Product product = productRepository.findById(reviewDTO.getProductId())
                 .orElseThrow(() -> new ResourceNotFoundException("Product not found with id: " + reviewDTO.getProductId()));
 
-        // Check if user exists
+        // Kiểm tra user
         User user = userRepository.findById(reviewDTO.getUserId())
                 .orElseThrow(() -> new ResourceNotFoundException("User not found with id: " + reviewDTO.getUserId()));
 
-        // Optional: Verify that user has purchased the product before allowing review
-        /*
-        Boolean hasPurchased = orderItemRepository.findByProductId(product.getId()).stream()
-                .anyMatch(item -> item.getOrder().getUser() != null &&
-                                 item.getOrder().getUser().getId().equals(user.getId()));
-
-        if (!hasPurchased) {
-            throw new IllegalArgumentException("User must purchase the product before reviewing");
-        }
-        */
-
-        // Check rating range
-        if (reviewDTO.getRating() < 1 || reviewDTO.getRating() > 5) {
-            throw new IllegalArgumentException("Rating must be between 1 and 5");
-        }
-
-        // Create new review
+        // Tạo đối tượng Review mới
         Review review = new Review();
         review.setProduct(product);
         review.setUser(user);
         review.setRating(reviewDTO.getRating());
+        
+        // Sử dụng title và content mới
+        review.setTitle(reviewDTO.getTitle());
+        review.setContent(reviewDTO.getContent());
+        
+        // Vẫn giữ lại trường comment cho khả năng tương thích ngược
         review.setComment(reviewDTO.getComment());
 
         Review savedReview = reviewRepository.save(review);
+
+        // Cập nhật lại điểm đánh giá trung bình của sản phẩm
+        updateProductRating(product.getId());
 
         return convertToDTO(savedReview);
     }
@@ -200,6 +193,8 @@ public class ReviewServiceImpl implements ReviewService {
         dto.setUserId(review.getUser().getId());
         dto.setUsername(review.getUser().getUsername());
         dto.setRating(review.getRating());
+        dto.setTitle(review.getTitle());
+        dto.setContent(review.getContent());
         dto.setComment(review.getComment());
         dto.setCreatedAt(review.getCreatedAt());
         dto.setUpdatedAt(review.getUpdatedAt());
@@ -270,5 +265,20 @@ public class ReviewServiceImpl implements ReviewService {
         reviewDTO.setUserId(user.getId());
 
         return updateReview(id, reviewDTO);
+    }
+
+    /**
+     * Cập nhật điểm đánh giá trung bình cho sản phẩm
+     * @param productId ID của sản phẩm cần cập nhật
+     */
+    private void updateProductRating(Integer productId) {
+        Double avgRating = calculateAverageRating(productId);
+        
+        Product product = productRepository.findById(productId)
+                .orElseThrow(() -> new ResourceNotFoundException("Product not found with id: " + productId));
+        
+        // Cập nhật lưu vào product nếu cần
+        // product.setAverageRating(avgRating);
+        // productRepository.save(product);
     }
 }

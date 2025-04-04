@@ -29,6 +29,12 @@ public class Review {
     @Column(name = "Rating", nullable = false, columnDefinition = "TINYINT")
     private Integer rating;
 
+    @Column(name = "Title")
+    private String title;
+
+    @Column(name = "Content", columnDefinition = "TEXT")
+    private String content;
+
     @Column(name = "Comment")
     private String comment;
 
