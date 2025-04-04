@@ -170,25 +170,20 @@ public class OrderServiceImpl implements OrderService {
     @Override
     @Transactional(isolation = Isolation.SERIALIZABLE)
     public OrderDTO processCheckout(CheckoutRequest checkoutRequest) {
-        // Khóa giỏ hàng để đảm bảo chỉ có một giao dịch có thể xử lý tại một thời điểm
-        Integer cartId = checkoutRequest.getCartId();
-        
-        // Sử dụng pessimistic lock để khóa bản ghi giỏ hàng
-        Cart cart;
-        try {
-            cart = cartRepository.findByIdWithItemsAndProductsForUpdate(cartId)
-                    .orElseThrow(() -> new ResourceNotFoundException("Cart not found with id: " + cartId));
-        } catch (Exception e) {
-            throw new IllegalStateException("Giỏ hàng đang được xử lý bởi một giao dịch khác, vui lòng thử lại sau.");
-        }
+        // Get cart
+        Cart cart = cartRepository.findByIdWithFullDetails(checkoutRequest.getCartId())
+                .orElseThrow(() -> new ResourceNotFoundException("Cart not found with id: " + checkoutRequest.getCartId()));
 
         // Kiểm tra xem giỏ hàng đã được thanh toán chưa
         if (cart.getIsCheckedOut()) {
-            throw new IllegalStateException("Giỏ hàng này đã được thanh toán");
+            throw new IllegalStateException("Giỏ hàng này đã được thanh toán. Vui lòng tạo giỏ hàng mới.");
         }
 
-        if (cart.getItems() == null || cart.getItems().isEmpty()) {
-            throw new IllegalArgumentException("Cart is empty");
+        // Get user if user ID is provided
+        User user = null;
+        if (checkoutRequest.getUserId() != null) {
+            user = userRepository.findById(checkoutRequest.getUserId())
+                    .orElseThrow(() -> new ResourceNotFoundException("User not found with id: " + checkoutRequest.getUserId()));
         }
 
         // Create new order
@@ -196,8 +191,6 @@ public class OrderServiceImpl implements OrderService {
 
         // Set user if provided
         if (checkoutRequest.getUserId() != null) {
-            User user = userRepository.findById(checkoutRequest.getUserId())
-                    .orElseThrow(() -> new ResourceNotFoundException("User not found with id: " + checkoutRequest.getUserId()));
             order.setUser(user);
         } else {
             // Set guest info

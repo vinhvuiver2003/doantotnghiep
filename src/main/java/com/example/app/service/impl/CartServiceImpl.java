@@ -68,6 +68,10 @@ public class CartServiceImpl implements CartService {
 
         if (optionalCart.isPresent()) {
             Cart cart = optionalCart.get();
+            // Kiểm tra nếu giỏ hàng đã được thanh toán, tạo giỏ hàng mới
+            if (cart.getIsCheckedOut()) {
+                return createCart(userId, null);
+            }
             return convertToDTO(cart);
         } else {
             // Create new cart for user
@@ -82,6 +86,10 @@ public class CartServiceImpl implements CartService {
 
         if (optionalCart.isPresent()) {
             Cart cart = optionalCart.get();
+            // Kiểm tra nếu giỏ hàng đã được thanh toán, tạo giỏ hàng mới
+            if (cart.getIsCheckedOut()) {
+                return createCart(null, sessionId);
+            }
             return convertToDTO(cart);
         } else {
             // Create new cart for guest
@@ -274,6 +282,15 @@ public class CartServiceImpl implements CartService {
 
         if (optionalUserCart.isPresent()) {
             userCart = optionalUserCart.get();
+            // Kiểm tra nếu giỏ hàng người dùng đã thanh toán, tạo giỏ hàng mới
+            if (userCart.getIsCheckedOut()) {
+                User user = userRepository.findById(userId)
+                        .orElseThrow(() -> new ResourceNotFoundException("User not found with id: " + userId));
+                
+                userCart = new Cart();
+                userCart.setUser(user);
+                userCart = cartRepository.save(userCart);
+            }
         } else {
             User user = userRepository.findById(userId)
                     .orElseThrow(() -> new ResourceNotFoundException("User not found with id: " + userId));
@@ -284,6 +301,11 @@ public class CartServiceImpl implements CartService {
         }
 
         Cart guestCart = optionalGuestCart.get();
+        
+        // Kiểm tra nếu giỏ hàng khách đã thanh toán, bỏ qua việc hợp nhất
+        if (guestCart.getIsCheckedOut()) {
+            return;
+        }
 
         // Merge items
         List<CartItem> guestItems = cartItemRepository.findByCartId(guestCart.getId());
@@ -317,6 +339,106 @@ public class CartServiceImpl implements CartService {
         // Delete guest cart and its items
         cartItemRepository.deleteByCartId(guestCart.getId());
         cartRepository.delete(guestCart);
+    }
+
+    @Override
+    public CartDTO getCartByCurrentUser(String username) {
+        // Tìm user từ username
+        User user = userRepository.findByUsername(username)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found with username: " + username));
+
+        // Tìm giỏ hàng của user hoặc tạo mới
+        Optional<Cart> optionalCart = cartRepository.findByUserId(user.getId());
+
+        if (optionalCart.isPresent()) {
+            Cart cart = optionalCart.get();
+            // Kiểm tra nếu giỏ hàng đã được thanh toán, tạo giỏ hàng mới
+            if (cart.getIsCheckedOut()) {
+                return createCart(user.getId(), null);
+            }
+            return convertToDTO(cart);
+        } else {
+            // Tạo giỏ hàng mới cho user
+            return createCart(user.getId(), null);
+        }
+    }
+
+    @Override
+    @Transactional
+    public CartDTO mergeGuestCartWithUserCart(String sessionId, String username) {
+        // Tìm user từ username
+        User user = userRepository.findByUsername(username)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found with username: " + username));
+
+        // Tìm giỏ hàng khách từ sessionId
+        Optional<Cart> optionalGuestCart = cartRepository.findBySessionId(sessionId);
+        if (!optionalGuestCart.isPresent()) {
+            throw new ResourceNotFoundException("Guest cart not found with sessionId: " + sessionId);
+        }
+
+        Cart guestCart = optionalGuestCart.get();
+        // Kiểm tra nếu giỏ hàng khách đã thanh toán, bỏ qua việc hợp nhất
+        if (guestCart.getIsCheckedOut()) {
+            // Trả về giỏ hàng hiện tại của người dùng hoặc tạo mới
+            return getCartByCurrentUser(username);
+        }
+
+        // Tìm hoặc tạo giỏ hàng người dùng
+        Optional<Cart> optionalUserCart = cartRepository.findByUserId(user.getId());
+        Cart userCart;
+
+        if (optionalUserCart.isPresent()) {
+            userCart = optionalUserCart.get();
+            // Kiểm tra nếu giỏ hàng người dùng đã thanh toán, tạo giỏ hàng mới
+            if (userCart.getIsCheckedOut()) {
+                userCart = new Cart();
+                userCart.setUser(user);
+                userCart = cartRepository.save(userCart);
+            }
+        } else {
+            userCart = new Cart();
+            userCart.setUser(user);
+            userCart = cartRepository.save(userCart);
+        }
+
+        // Hợp nhất các mục trong giỏ hàng
+        List<CartItem> guestItems = cartItemRepository.findByCartId(guestCart.getId());
+
+        for (CartItem guestItem : guestItems) {
+            // Kiểm tra xem sản phẩm đã tồn tại trong giỏ hàng người dùng chưa
+            Optional<CartItem> existingUserItem = cartItemRepository.findByCartIdAndProductIdAndVariantId(
+                    userCart.getId(), guestItem.getProduct().getId(), guestItem.getVariant().getId());
+
+            if (existingUserItem.isPresent()) {
+                // Cập nhật số lượng
+                CartItem userItem = existingUserItem.get();
+                userItem.setQuantity(userItem.getQuantity() + guestItem.getQuantity());
+                cartItemRepository.save(userItem);
+            } else {
+                // Tạo mục mới trong giỏ hàng người dùng
+                CartItem newUserItem = new CartItem();
+                newUserItem.setCart(userCart);
+                newUserItem.setProduct(guestItem.getProduct());
+                newUserItem.setVariant(guestItem.getVariant());
+                newUserItem.setQuantity(guestItem.getQuantity());
+
+                cartItemRepository.save(newUserItem);
+            }
+        }
+
+        // Cập nhật thời gian cho giỏ hàng người dùng
+        userCart.setUpdatedAt(LocalDateTime.now());
+        cartRepository.save(userCart);
+
+        // Xóa giỏ hàng khách và các mục trong đó
+        cartItemRepository.deleteByCartId(guestCart.getId());
+        cartRepository.delete(guestCart);
+
+        // Lấy giỏ hàng người dùng đã cập nhật
+        Cart updatedUserCart = cartRepository.findByIdWithItems(userCart.getId())
+                .orElseThrow(() -> new ResourceNotFoundException("User cart not found after merging"));
+
+        return convertToDTO(updatedUserCart);
     }
 
     // Utility method to convert Entity to DTO
@@ -372,89 +494,5 @@ public class CartServiceImpl implements CartService {
         dto.setTotalItems(itemDTOs.size());
 
         return dto;
-    }
-    @Override
-    public CartDTO getCartByCurrentUser(String username) {
-        // Tìm user từ username
-        User user = userRepository.findByUsername(username)
-                .orElseThrow(() -> new ResourceNotFoundException("User not found with username: " + username));
-
-        // Tìm giỏ hàng của user hoặc tạo mới
-        Optional<Cart> optionalCart = cartRepository.findByUserId(user.getId());
-
-        if (optionalCart.isPresent()) {
-            Cart cart = optionalCart.get();
-            return convertToDTO(cart);
-        } else {
-            // Tạo giỏ hàng mới cho user
-            return createCart(user.getId(), null);
-        }
-    }
-
-    @Override
-    @Transactional
-    public CartDTO mergeGuestCartWithUserCart(String sessionId, String username) {
-        // Tìm user từ username
-        User user = userRepository.findByUsername(username)
-                .orElseThrow(() -> new ResourceNotFoundException("User not found with username: " + username));
-
-        // Tìm giỏ hàng khách từ sessionId
-        Optional<Cart> optionalGuestCart = cartRepository.findBySessionId(sessionId);
-        if (!optionalGuestCart.isPresent()) {
-            throw new ResourceNotFoundException("Guest cart not found with sessionId: " + sessionId);
-        }
-
-        // Tìm hoặc tạo giỏ hàng người dùng
-        Optional<Cart> optionalUserCart = cartRepository.findByUserId(user.getId());
-        Cart userCart;
-
-        if (optionalUserCart.isPresent()) {
-            userCart = optionalUserCart.get();
-        } else {
-            userCart = new Cart();
-            userCart.setUser(user);
-            userCart = cartRepository.save(userCart);
-        }
-
-        Cart guestCart = optionalGuestCart.get();
-
-        // Hợp nhất các mục trong giỏ hàng
-        List<CartItem> guestItems = cartItemRepository.findByCartId(guestCart.getId());
-
-        for (CartItem guestItem : guestItems) {
-            // Kiểm tra xem sản phẩm đã tồn tại trong giỏ hàng người dùng chưa
-            Optional<CartItem> existingUserItem = cartItemRepository.findByCartIdAndProductIdAndVariantId(
-                    userCart.getId(), guestItem.getProduct().getId(), guestItem.getVariant().getId());
-
-            if (existingUserItem.isPresent()) {
-                // Cập nhật số lượng
-                CartItem userItem = existingUserItem.get();
-                userItem.setQuantity(userItem.getQuantity() + guestItem.getQuantity());
-                cartItemRepository.save(userItem);
-            } else {
-                // Tạo mục mới trong giỏ hàng người dùng
-                CartItem newUserItem = new CartItem();
-                newUserItem.setCart(userCart);
-                newUserItem.setProduct(guestItem.getProduct());
-                newUserItem.setVariant(guestItem.getVariant());
-                newUserItem.setQuantity(guestItem.getQuantity());
-
-                cartItemRepository.save(newUserItem);
-            }
-        }
-
-        // Cập nhật thời gian cho giỏ hàng người dùng
-        userCart.setUpdatedAt(LocalDateTime.now());
-        cartRepository.save(userCart);
-
-        // Xóa giỏ hàng khách và các mục trong đó
-        cartItemRepository.deleteByCartId(guestCart.getId());
-        cartRepository.delete(guestCart);
-
-        // Lấy giỏ hàng người dùng đã cập nhật
-        Cart updatedUserCart = cartRepository.findByIdWithItems(userCart.getId())
-                .orElseThrow(() -> new ResourceNotFoundException("User cart not found after merging"));
-
-        return convertToDTO(updatedUserCart);
     }
 }
