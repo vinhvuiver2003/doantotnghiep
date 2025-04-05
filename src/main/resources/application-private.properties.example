@@ -1,0 +1,29 @@
+# Đây là file ví dụ cho application-private.properties
+# Sao chép file này thành application-private.properties và cung cấp các giá trị thực tế
+# application-private.properties sẽ được bỏ qua bởi git
+
+# Database
+spring.datasource.url=jdbc:mysql://localhost:3306/fashion_store?useSSL=false
+spring.datasource.username=root
+spring.datasource.password=your_password_here
+
+# JWT Properties
+fashion.app.jwtSecret=your_jwt_secret_key_here
+fashion.app.jwtExpirationMs=86400000
+
+# Email Configuration
+spring.mail.host=smtp.gmail.com
+spring.mail.port=587
+spring.mail.username=your_email@gmail.com
+spring.mail.password=your_email_app_password_here
+spring.mail.properties.mail.smtp.auth=true
+spring.mail.properties.mail.smtp.starttls.enable=true
+
+# SePay Configuration
+sepay.merchant-id=your_sepay_merchant_id
+sepay.api-key=your_sepay_api_key
+sepay.secret-key=your_sepay_secret_key
+sepay.payment-url=https://sandbox.sepay.vn/api/payment
+
+# Các thông tin nhạy cảm khác
+# ... 

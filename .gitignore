@@ -31,3 +31,51 @@ build/
 
 ### VS Code ###
 .vscode/
+
+### Sensitive Data ###
+# Properties files containing sensitive information
+application-dev.properties
+application-prod.properties
+application-local.properties
+application-private.properties
+application-secret.properties
+
+# Credential files
+*.jks
+*.p12
+*.pem
+*.key
+*.crt
+*.cer
+
+# Configuration file backups
+*.properties.bak
+*.yml.bak
+*.yaml.bak
+
+# Logs 
+logs/
+*.log
+
+# Upload files directory
+uploads/
+
+# Environment variables
+.env
+.env.local
+.env.development
+.env.test
+.env.production
+
+# JWT and other security keys
+**/resources/keys/
+**/resources/security/
+
+# Application-specific sensitive data
+src/main/resources/application-secrets.properties
+src/main/resources/client_secret*.json
+
+# Node
+node_modules/
+npm-debug.log
+yarn-error.log
