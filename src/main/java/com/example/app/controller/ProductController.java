@@ -244,4 +244,17 @@ public class ProductController {
         List<ProductDTO> randomProducts = productService.getRandomProducts(limit);
         return ResponseEntity.ok(randomProducts);
     }
+
+    @GetMapping("/category/{categoryId}/brand/{brandId}")
+    public ResponseEntity<PagedResponse<ProductDTO>> getProductsByCategoryAndBrand(
+        @PathVariable Integer categoryId,
+        @PathVariable Integer brandId,
+        @RequestParam(defaultValue = "0") int page,
+        @RequestParam(defaultValue = "10") int size,
+        @RequestParam(defaultValue = "createdAt") String sortBy,
+        @RequestParam(defaultValue = "desc") String sortDir) {
+        PagedResponse<ProductDTO> response = productService.getProductsByCategoryAndBrand(
+            categoryId, brandId, page, size, sortBy, sortDir);
+        return ResponseEntity.ok(response);
+    }
 }

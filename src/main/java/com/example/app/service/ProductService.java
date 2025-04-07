@@ -33,4 +33,6 @@ public interface ProductService {
     void deleteProduct(Integer id);
 
     Long countProducts();
+
+    PagedResponse<ProductDTO> getProductsByCategoryAndBrand(Integer categoryId, Integer brandId, int page, int size, String sortBy, String sortDir);
 }

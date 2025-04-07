@@ -192,27 +192,35 @@ public class ProductServiceImpl implements ProductService {
 
     @Override
     public PagedResponse<ProductDTO> getProductsByCategory(Integer categoryId, int page, int size, String sortBy, String sortDir) {
-        // Check if category exists
-        if (!categoryRepository.existsById(categoryId)) {
-            throw new ResourceNotFoundException("Category not found with id: " + categoryId);
+        // Lấy danh mục hiện tại
+        Category category = categoryRepository.findById(categoryId)
+            .orElseThrow(() -> new RuntimeException("Category not found with id: " + categoryId));
+        
+        // Nếu là danh mục cha, lấy tất cả danh mục con
+        List<Integer> categoryIds = new ArrayList<>();
+        categoryIds.add(categoryId);
+        
+        if (category.getParent() == null) {
+            // Lấy tất cả danh mục con
+            List<Category> childCategories = categoryRepository.findByParentId(categoryId);
+            categoryIds.addAll(childCategories.stream()
+                .map(Category::getId)
+                .collect(Collectors.toList()));
         }
-
-        Sort sort = sortDir.equalsIgnoreCase("desc") ? Sort.by(sortBy).descending() : Sort.by(sortBy).ascending();
-        Pageable pageable = PageRequest.of(page, size, sort);
-        Page<Product> products = productRepository.findByCategoryId(categoryId, pageable);
-
-        List<ProductDTO> content = products.getContent().stream()
-                .map(this::convertToDTOSafe)
-                .filter(dto -> dto != null)
-                .collect(Collectors.toList());
-
+        
+        // Lấy sản phẩm theo danh mục
+        Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.fromString(sortDir), sortBy));
+        Page<Product> products = productRepository.findByCategoryIdIn(categoryIds, pageable);
+        
         return new PagedResponse<>(
-                content,
-                products.getNumber(),
-                products.getSize(),
-                products.getTotalElements(),
-                products.getTotalPages(),
-                products.isLast()
+            products.getContent().stream()
+                .map(this::convertToDTOSafe)
+                .collect(Collectors.toList()),
+            products.getNumber(),
+            products.getSize(),
+            products.getTotalElements(),
+            products.getTotalPages(),
+            products.isLast()
         );
     }
 
@@ -645,6 +653,22 @@ public class ProductServiceImpl implements ProductService {
             .map(this::convertToDTOSafe)
             .filter(dto -> dto != null)
             .collect(Collectors.toList());
+    }
+
+    @Override
+    public PagedResponse<ProductDTO> getProductsByCategoryAndBrand(Integer categoryId, Integer brandId, int page, int size, String sortBy, String sortDir) {
+        Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.fromString(sortDir), sortBy));
+        Page<Product> products = productRepository.findByCategoryIdAndBrandId(categoryId, brandId, pageable);
+        return new PagedResponse<>(
+            products.getContent().stream()
+                .map(this::convertToDTOSafe)
+                .collect(Collectors.toList()),
+            products.getNumber(),
+            products.getSize(),
+            products.getTotalElements(),
+            products.getTotalPages(),
+            products.isLast()
+        );
     }
 
     // Helper method for safe conversion
