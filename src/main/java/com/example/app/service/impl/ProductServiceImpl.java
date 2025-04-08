@@ -305,12 +305,17 @@ public class ProductServiceImpl implements ProductService {
 
     @Override
     public List<ProductDTO> getTopRatedProducts(int limit) {
-        Pageable pageable = PageRequest.of(0, limit);
-        List<Product> products = productRepository.findTopRatedProducts(pageable);
-
-        return products.stream()
+        List<Product> topRatedProducts = productRepository.findTopRatedProducts(limit);
+        return topRatedProducts.stream()
                 .map(this::convertToDTOSafe)
-                .filter(dto -> dto != null)
+                .collect(Collectors.toList());
+    }
+
+    @Override
+    public List<ProductDTO> getBestSellingProducts(int limit) {
+        List<Product> bestSellingProducts = productRepository.findBestSellingProducts(limit);
+        return bestSellingProducts.stream()
+                .map(this::convertToDTOSafe)
                 .collect(Collectors.toList());
     }
 

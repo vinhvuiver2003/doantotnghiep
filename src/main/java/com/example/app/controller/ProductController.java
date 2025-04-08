@@ -199,6 +199,22 @@ public class ProductController {
     }
 
     /**
+     * Lấy danh sách sản phẩm bán chạy nhất
+     */
+    @GetMapping("/best-selling")
+    public ResponseEntity<?> getBestSellingProducts(
+            @RequestParam(defaultValue = "8") int limit) {
+
+        try {
+            List<ProductDTO> products = productService.getBestSellingProducts(limit);
+            return ResponseEntity.ok(ResponseWrapper.success("Best selling products retrieved successfully", products));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(ResponseWrapper.error("Error retrieving best selling products: " + e.getMessage()));
+        }
+    }
+
+    /**
      * Lấy danh sách sản phẩm có tồn kho thấp (chỉ ADMIN)
      */
     @GetMapping("/low-stock")

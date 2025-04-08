@@ -28,8 +28,8 @@ public interface ProductRepository extends JpaRepository<Product, Integer> {
     @Query("SELECT p FROM Product p WHERE p.status = 'active' ORDER BY p.createdAt DESC")
     List<Product> findNewArrivals(Pageable pageable);
 
-    @Query("SELECT p FROM Product p JOIN p.reviews r GROUP BY p ORDER BY AVG(r.rating) DESC")
-    List<Product> findTopRatedProducts(Pageable pageable);
+    @Query("SELECT p FROM Product p LEFT JOIN p.reviews r GROUP BY p ORDER BY COALESCE(AVG(r.rating), 0) DESC")
+    List<Product> findTopRatedProducts(int limit);
 
     @Query("SELECT DISTINCT p FROM Product p JOIN p.variants v WHERE v.stockQuantity < :threshold")
     List<Product> findLowStockProducts(@Param("threshold") Integer threshold);
@@ -78,4 +78,11 @@ public interface ProductRepository extends JpaRepository<Product, Integer> {
     Page<Product> findByCategoryIdAndBrandId(Integer categoryId, Integer brandId, Pageable pageable);
 
     Page<Product> findByCategoryIdIn(List<Integer> categoryIds, Pageable pageable);
+
+    @Query(value = "SELECT p.* FROM Product p " +
+            "JOIN fashion_store.order_item oi ON p.Product_ID = oi.Product_ID " +
+            "GROUP BY p.Product_ID " +
+            "ORDER BY SUM(oi.Quantity) DESC " +
+            "LIMIT :limit", nativeQuery = true)
+    List<Product> findBestSellingProducts(@Param("limit") int limit);
 }

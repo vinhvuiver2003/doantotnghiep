@@ -22,6 +22,8 @@ public interface ProductService {
 
     List<ProductDTO> getTopRatedProducts(int limit);
 
+    List<ProductDTO> getBestSellingProducts(int limit);
+
     List<ProductDTO> getLowStockProducts(int threshold);
 
     List<ProductDTO> getRandomProducts(int limit);

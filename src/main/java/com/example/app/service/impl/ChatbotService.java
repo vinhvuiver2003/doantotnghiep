@@ -28,6 +28,15 @@ public class ChatbotService {
     @Value("${api.promotions}")
     private String apipromotions;
 
+    @Value("${api.top_rated}")
+    private String apiTopRated = "http://localhost:8080/api/products/top-rated?limit=5";
+
+    @Value("${api.new_arrivals}")
+    private String apiNewArrivals = "http://localhost:8080/api/products/new-arrivals?limit=5";
+
+    @Value("${api.best_selling}")
+    private String apiBestSelling = "http://localhost:8080/api/products/best-selling?limit=5";
+
     @Value("${chatbot.system.prompt}")
     private String defaultPrompt;
 
@@ -41,6 +50,9 @@ public class ChatbotService {
 
         String productsData = "";
         String promotionsData = "";
+        String topRatedData = "";
+        String newArrivalsData = "";
+        String bestSellingData = "";
         try {
             ResponseEntity<String> extraDataResponse = restTemplate.getForEntity(apiproducts, String.class);
             if (extraDataResponse.getStatusCode() == HttpStatus.OK) {
@@ -52,6 +64,43 @@ public class ChatbotService {
         } catch (Exception ex) {
             logger.warn("Lỗi khi lấy dữ liệu bổ sung: {}", ex.getMessage());
         }
+        
+        try {
+            ResponseEntity<String> topRatedResponse = restTemplate.getForEntity(apiTopRated, String.class);
+            if (topRatedResponse.getStatusCode() == HttpStatus.OK) {
+                topRatedData = topRatedResponse.getBody();
+                logger.info("Dữ liệu sản phẩm đánh giá cao: {}", topRatedData);
+            } else {
+                logger.warn("Không thể lấy dữ liệu đánh giá cao. Mã lỗi: {}", topRatedResponse.getStatusCode());
+            }
+        } catch (Exception ex) {
+            logger.warn("Lỗi khi lấy dữ liệu đánh giá cao: {}", ex.getMessage());
+        }
+        
+        try {
+            ResponseEntity<String> newArrivalsResponse = restTemplate.getForEntity(apiNewArrivals, String.class);
+            if (newArrivalsResponse.getStatusCode() == HttpStatus.OK) {
+                newArrivalsData = newArrivalsResponse.getBody();
+                logger.info("Dữ liệu sản phẩm mới: {}", newArrivalsData);
+            } else {
+                logger.warn("Không thể lấy dữ liệu sản phẩm mới. Mã lỗi: {}", newArrivalsResponse.getStatusCode());
+            }
+        } catch (Exception ex) {
+            logger.warn("Lỗi khi lấy dữ liệu sản phẩm mới: {}", ex.getMessage());
+        }
+        
+        try {
+            ResponseEntity<String> bestSellingResponse = restTemplate.getForEntity(apiBestSelling, String.class);
+            if (bestSellingResponse.getStatusCode() == HttpStatus.OK) {
+                bestSellingData = bestSellingResponse.getBody();
+                logger.info("Dữ liệu sản phẩm bán chạy nhất: {}", bestSellingData);
+            } else {
+                logger.warn("Không thể lấy dữ liệu sản phẩm bán chạy. Mã lỗi: {}", bestSellingResponse.getStatusCode());
+            }
+        } catch (Exception ex) {
+            logger.warn("Lỗi khi lấy dữ liệu sản phẩm bán chạy: {}", ex.getMessage());
+        }
+        
         try {
             ResponseEntity<String> userResponse = restTemplate.getForEntity(apipromotions, String.class);
             if (userResponse.getStatusCode() == HttpStatus.OK) {
@@ -64,7 +113,13 @@ public class ChatbotService {
             logger.warn("Lỗi khi lấy dữ liệu người dùng: {}", ex.getMessage());
         }
         // 🔧 Thêm dữ liệu bổ sung vào prompt
-        String fullMessage = defaultPrompt + "\n\nDữ liệu bổ sung: thông tin các sản phẩm: " + productsData + "\ncác thông tin khuyến mãi :" + promotionsData + "\n\nCâu hỏi người dùng: " + message;
+        String fullMessage = defaultPrompt + 
+                "\n\nDữ liệu bổ sung: thông tin các sản phẩm: " + productsData + 
+                "\ncác thông tin khuyến mãi: " + promotionsData + 
+                "\nsản phẩm đánh giá cao nhất: " + topRatedData + 
+                "\nsản phẩm mới nhất: " + newArrivalsData + 
+                "\nsản phẩm bán chạy nhất: " + bestSellingData +
+                "\n\nCâu hỏi người dùng: " + message;
 
 
         // Tạo payload theo định dạng Gemini
