@@ -2,7 +2,6 @@ package com.example.app.service;
 
 import com.example.app.dto.PagedResponse;
 import com.example.app.dto.PromotionDTO;
-import com.example.app.entity.Promotion;
 
 import java.util.List;
 
