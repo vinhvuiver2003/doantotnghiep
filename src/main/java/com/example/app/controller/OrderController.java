@@ -1,7 +1,7 @@
 package com.example.app.controller;
 
 
-import com.example.app.dto.ApiResponse;
+import com.example.app.dto.ResponseWrapper;
 import com.example.app.dto.CheckoutRequest;
 import com.example.app.dto.OrderDTO;
 import com.example.app.dto.PagedResponse;
@@ -41,14 +41,14 @@ public class OrderController {
      */
     @GetMapping
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<ApiResponse<PagedResponse<OrderDTO>>> getAllOrders(
+    public ResponseEntity<ResponseWrapper<PagedResponse<OrderDTO>>> getAllOrders(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size,
             @RequestParam(defaultValue = "createdAt") String sortBy,
             @RequestParam(defaultValue = "desc") String sortDir) {
 
         PagedResponse<OrderDTO> orders = orderService.getAllOrders(page, size, sortBy, sortDir);
-        return ResponseEntity.ok(ApiResponse.success("Orders retrieved successfully", orders));
+        return ResponseEntity.ok(ResponseWrapper.success("Orders retrieved successfully", orders));
     }
 
     /**
@@ -56,16 +56,16 @@ public class OrderController {
      */
     @GetMapping("/{id}")
     @PreAuthorize("hasRole('ADMIN') or @orderSecurity.isOwner(#id)")
-    public ResponseEntity<ApiResponse<OrderDTO>> getOrderById(@PathVariable Integer id) {
+    public ResponseEntity<ResponseWrapper<OrderDTO>> getOrderById(@PathVariable Integer id) {
         OrderDTO order = orderService.getOrderById(id);
-        return ResponseEntity.ok(ApiResponse.success("Order retrieved successfully", order));
+        return ResponseEntity.ok(ResponseWrapper.success("Order retrieved successfully", order));
     }
 
     /**
      * Lấy danh sách đơn hàng của người dùng hiện tại
      */
     @GetMapping("/my-orders")
-    public ResponseEntity<ApiResponse<PagedResponse<OrderDTO>>> getMyOrders(
+    public ResponseEntity<ResponseWrapper<PagedResponse<OrderDTO>>> getMyOrders(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size) {
 
@@ -74,7 +74,7 @@ public class OrderController {
 
         // Lấy ID người dùng từ username (thực hiện trong OrderService)
         PagedResponse<OrderDTO> orders = orderService.getOrdersByCurrentUser(username, page, size);
-        return ResponseEntity.ok(ApiResponse.success("Your orders retrieved successfully", orders));
+        return ResponseEntity.ok(ResponseWrapper.success("Your orders retrieved successfully", orders));
     }
 
     /**
@@ -82,13 +82,13 @@ public class OrderController {
      */
     @GetMapping("/user/{userId}")
     @PreAuthorize("hasRole('ADMIN') or @userSecurity.isCurrentUser(#userId)")
-    public ResponseEntity<ApiResponse<PagedResponse<OrderDTO>>> getOrdersByUser(
+    public ResponseEntity<ResponseWrapper<PagedResponse<OrderDTO>>> getOrdersByUser(
             @PathVariable Integer userId,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size) {
 
         PagedResponse<OrderDTO> orders = orderService.getOrdersByUser(userId, page, size);
-        return ResponseEntity.ok(ApiResponse.success("User orders retrieved successfully", orders));
+        return ResponseEntity.ok(ResponseWrapper.success("User orders retrieved successfully", orders));
     }
 
     /**
@@ -96,19 +96,19 @@ public class OrderController {
      */
     @GetMapping("/status/{status}")
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<ApiResponse<List<OrderDTO>>> getOrdersByStatus(
+    public ResponseEntity<ResponseWrapper<List<OrderDTO>>> getOrdersByStatus(
             @PathVariable String status) {
 
         Order.OrderStatus orderStatus = Order.OrderStatus.valueOf(status);
         List<OrderDTO> orders = orderService.getOrdersByStatus(orderStatus);
-        return ResponseEntity.ok(ApiResponse.success("Orders by status retrieved successfully", orders));
+        return ResponseEntity.ok(ResponseWrapper.success("Orders by status retrieved successfully", orders));
     }
 
     /**
      * Tạo đơn hàng mới từ giỏ hàng (checkout)
      */
     @PostMapping("/checkout")
-    public ResponseEntity<ApiResponse<OrderDTO>> checkout(
+    public ResponseEntity<ResponseWrapper<OrderDTO>> checkout(
             @Valid @RequestBody CheckoutRequest checkoutRequest) {
 
         // Kiểm tra nếu người dùng đã đăng nhập
@@ -142,7 +142,7 @@ public class OrderController {
 
         OrderDTO newOrder = orderService.processCheckout(checkoutRequest);
         return new ResponseEntity<>(
-                ApiResponse.success("Order created successfully", newOrder),
+                ResponseWrapper.success("Order created successfully", newOrder),
                 HttpStatus.CREATED);
     }
 
@@ -151,12 +151,12 @@ public class OrderController {
      */
     @PostMapping
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<ApiResponse<OrderDTO>> createOrder(
+    public ResponseEntity<ResponseWrapper<OrderDTO>> createOrder(
             @Valid @RequestBody OrderDTO orderDTO) {
 
         OrderDTO newOrder = orderService.createOrder(orderDTO);
         return new ResponseEntity<>(
-                ApiResponse.success("Order created successfully", newOrder),
+                ResponseWrapper.success("Order created successfully", newOrder),
                 HttpStatus.CREATED);
     }
 
@@ -165,13 +165,13 @@ public class OrderController {
      */
     @PatchMapping("/{id}/status")
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<ApiResponse<OrderDTO>> updateOrderStatus(
+    public ResponseEntity<ResponseWrapper<OrderDTO>> updateOrderStatus(
             @PathVariable Integer id,
             @RequestParam String status) {
 
         Order.OrderStatus orderStatus = Order.OrderStatus.valueOf(status);
         OrderDTO updatedOrder = orderService.updateOrderStatus(id, orderStatus);
-        return ResponseEntity.ok(ApiResponse.success("Order status updated successfully", updatedOrder));
+        return ResponseEntity.ok(ResponseWrapper.success("Order status updated successfully", updatedOrder));
     }
 
     /**
@@ -179,9 +179,9 @@ public class OrderController {
      */
     @DeleteMapping("/{id}")
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<ApiResponse<?>> deleteOrder(@PathVariable Integer id) {
+    public ResponseEntity<ResponseWrapper<?>> deleteOrder(@PathVariable Integer id) {
         orderService.deleteOrder(id);
-        return ResponseEntity.ok(ApiResponse.success("Order deleted successfully"));
+        return ResponseEntity.ok(ResponseWrapper.success("Order deleted successfully"));
     }
 
     /**
@@ -189,7 +189,7 @@ public class OrderController {
      */
     @GetMapping("/stats/sales")
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<ApiResponse<Map<String, Object>>> getSalesStats(
+    public ResponseEntity<ResponseWrapper<Map<String, Object>>> getSalesStats(
             @RequestParam(required = false) LocalDateTime startDate,
             @RequestParam(required = false) LocalDateTime endDate) {
 
@@ -205,7 +205,7 @@ public class OrderController {
         }
 
         Map<String, Object> salesStats = orderService.getSalesStatistics(startDate, endDate);
-        return ResponseEntity.ok(ApiResponse.success("Sales statistics retrieved successfully", salesStats));
+        return ResponseEntity.ok(ResponseWrapper.success("Sales statistics retrieved successfully", salesStats));
     }
 
     /**
@@ -213,13 +213,13 @@ public class OrderController {
      */
     @PatchMapping("/{id}/confirm-delivery")
     @PreAuthorize("@orderSecurity.isOwner(#id)")
-    public ResponseEntity<ApiResponse<OrderDTO>> confirmDelivery(@PathVariable Integer id) {
+    public ResponseEntity<ResponseWrapper<OrderDTO>> confirmDelivery(@PathVariable Integer id) {
         // Lấy thông tin người dùng hiện tại
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         String username = authentication.getName();
         
         OrderDTO updatedOrder = orderService.confirmOrderDelivery(id, username);
-        return ResponseEntity.ok(ApiResponse.success("Xác nhận đã nhận hàng thành công", updatedOrder));
+        return ResponseEntity.ok(ResponseWrapper.success("Xác nhận đã nhận hàng thành công", updatedOrder));
     }
 
     /**
@@ -227,7 +227,7 @@ public class OrderController {
      */
     @PatchMapping("/{id}/cancel")
     @PreAuthorize("@orderSecurity.isOwner(#id)")
-    public ResponseEntity<ApiResponse<OrderDTO>> cancelOrderByUser(
+    public ResponseEntity<ResponseWrapper<OrderDTO>> cancelOrderByUser(
             @PathVariable Integer id,
             @RequestParam(required = false) String cancelReason) {
         
@@ -236,6 +236,6 @@ public class OrderController {
         String username = authentication.getName();
         
         OrderDTO cancelledOrder = orderService.cancelOrderByUser(id, username, cancelReason);
-        return ResponseEntity.ok(ApiResponse.success("Đơn hàng đã được hủy thành công", cancelledOrder));
+        return ResponseEntity.ok(ResponseWrapper.success("Đơn hàng đã được hủy thành công", cancelledOrder));
     }
 }

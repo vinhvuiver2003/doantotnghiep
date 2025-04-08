@@ -1,5 +1,5 @@
 package com.example.app.controller;
-import com.example.app.dto.ApiResponse;
+import com.example.app.dto.ResponseWrapper;
 import com.example.app.dto.PagedResponse;
 import com.example.app.dto.PromotionDTO;
 import com.example.app.service.PromotionService;
@@ -28,14 +28,14 @@ public class PromotionController {
      */
     @GetMapping
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<ApiResponse<PagedResponse<PromotionDTO>>> getAllPromotions(
+    public ResponseEntity<ResponseWrapper<PagedResponse<PromotionDTO>>> getAllPromotions(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size,
             @RequestParam(defaultValue = "id") String sortBy,
             @RequestParam(defaultValue = "desc") String sortDir) {
 
         PagedResponse<PromotionDTO> promotions = promotionService.getAllPromotions(page, size, sortBy, sortDir);
-        return ResponseEntity.ok(ApiResponse.success("Promotions retrieved successfully", promotions));
+        return ResponseEntity.ok(ResponseWrapper.success("Promotions retrieved successfully", promotions));
     }
 
     /**
@@ -43,40 +43,40 @@ public class PromotionController {
      */
     @GetMapping("/{id}")
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<ApiResponse<PromotionDTO>> getPromotionById(@PathVariable Integer id) {
+    public ResponseEntity<ResponseWrapper<PromotionDTO>> getPromotionById(@PathVariable Integer id) {
         PromotionDTO promotion = promotionService.getPromotionById(id);
-        return ResponseEntity.ok(ApiResponse.success("Promotion retrieved successfully", promotion));
+        return ResponseEntity.ok(ResponseWrapper.success("Promotion retrieved successfully", promotion));
     }
 
     /**
      * Lấy danh sách khuyến mãi đang hoạt động (cho trang chủ)
      */
     @GetMapping("/active")
-    public ResponseEntity<ApiResponse<List<PromotionDTO>>> getActivePromotions() {
+    public ResponseEntity<ResponseWrapper<List<PromotionDTO>>> getActivePromotions() {
         List<PromotionDTO> promotions = promotionService.getActivePromotions();
-        return ResponseEntity.ok(ApiResponse.success("Active promotions retrieved successfully", promotions));
+        return ResponseEntity.ok(ResponseWrapper.success("Active promotions retrieved successfully", promotions));
     }
 
     /**
      * Lấy danh sách khuyến mãi theo danh mục
      */
     @GetMapping("/category/{categoryId}")
-    public ResponseEntity<ApiResponse<List<PromotionDTO>>> getPromotionsByCategory(@PathVariable Integer categoryId) {
+    public ResponseEntity<ResponseWrapper<List<PromotionDTO>>> getPromotionsByCategory(@PathVariable Integer categoryId) {
         List<PromotionDTO> promotions = promotionService.getPromotionsByCategory(categoryId);
-        return ResponseEntity.ok(ApiResponse.success("Category promotions retrieved successfully", promotions));
+        return ResponseEntity.ok(ResponseWrapper.success("Category promotions retrieved successfully", promotions));
     }
 
     /**
      * Kiểm tra mã giảm giá có hợp lệ không
      */
     @GetMapping("/validate-code")
-    public ResponseEntity<ApiResponse<PromotionDTO>> validatePromotionCode(@RequestParam String code) {
+    public ResponseEntity<ResponseWrapper<PromotionDTO>> validatePromotionCode(@RequestParam String code) {
         try {
             PromotionDTO promotion = promotionService.validatePromotion(code);
-            return ResponseEntity.ok(ApiResponse.success("Promotion code is valid", promotion));
+            return ResponseEntity.ok(ResponseWrapper.success("Promotion code is valid", promotion));
         } catch (Exception e) {
-            // Tạo đối tượng ApiResponse<PromotionDTO> với data là null
-            ApiResponse<PromotionDTO> response = new ApiResponse<>(false, e.getMessage(), null);
+            // Tạo đối tượng ResponseWrapper<PromotionDTO> với data là null
+            ResponseWrapper<PromotionDTO> response = new ResponseWrapper<>(false, e.getMessage(), null);
             return ResponseEntity.badRequest().body(response);
         }
     }
@@ -86,10 +86,10 @@ public class PromotionController {
      */
     @PostMapping
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<ApiResponse<PromotionDTO>> createPromotion(@Valid @RequestBody PromotionDTO promotionDTO) {
+    public ResponseEntity<ResponseWrapper<PromotionDTO>> createPromotion(@Valid @RequestBody PromotionDTO promotionDTO) {
         PromotionDTO createdPromotion = promotionService.createPromotion(promotionDTO);
         return new ResponseEntity<>(
-                ApiResponse.success("Promotion created successfully", createdPromotion),
+                ResponseWrapper.success("Promotion created successfully", createdPromotion),
                 HttpStatus.CREATED);
     }
 
@@ -98,12 +98,12 @@ public class PromotionController {
      */
     @PutMapping("/{id}")
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<ApiResponse<PromotionDTO>> updatePromotion(
+    public ResponseEntity<ResponseWrapper<PromotionDTO>> updatePromotion(
             @PathVariable Integer id,
             @Valid @RequestBody PromotionDTO promotionDTO) {
 
         PromotionDTO updatedPromotion = promotionService.updatePromotion(id, promotionDTO);
-        return ResponseEntity.ok(ApiResponse.success("Promotion updated successfully", updatedPromotion));
+        return ResponseEntity.ok(ResponseWrapper.success("Promotion updated successfully", updatedPromotion));
     }
 
     /**
@@ -111,17 +111,17 @@ public class PromotionController {
      */
     @DeleteMapping("/{id}")
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<ApiResponse<?>> deletePromotion(@PathVariable Integer id) {
+    public ResponseEntity<ResponseWrapper<?>> deletePromotion(@PathVariable Integer id) {
         promotionService.deletePromotion(id);
-        return ResponseEntity.ok(ApiResponse.success("Promotion deleted successfully"));
+        return ResponseEntity.ok(ResponseWrapper.success("Promotion deleted successfully"));
     }
 
     /**
      * Lấy khuyến mãi theo mã code
      */
     @GetMapping("/code/{code}")
-    public ResponseEntity<ApiResponse<PromotionDTO>> getPromotionByCode(@PathVariable String code) {
+    public ResponseEntity<ResponseWrapper<PromotionDTO>> getPromotionByCode(@PathVariable String code) {
         PromotionDTO promotion = promotionService.getPromotionByCode(code);
-        return ResponseEntity.ok(ApiResponse.success("Promotion retrieved successfully", promotion));
+        return ResponseEntity.ok(ResponseWrapper.success("Promotion retrieved successfully", promotion));
     }
 }

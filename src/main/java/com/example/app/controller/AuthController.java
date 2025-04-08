@@ -1,9 +1,6 @@
 package com.example.app.controller;
-import com.example.app.dto.ApiResponse;
-import com.example.app.dto.LoginRequest;
-import com.example.app.dto.LoginResponse;
-import com.example.app.dto.UserCreateDTO;
-import com.example.app.dto.UserDTO;
+import com.example.app.dto.*;
+import com.example.app.dto.ResponseWrapper;
 import com.example.app.service.AuthService;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -28,59 +25,48 @@ public class AuthController {
         this.authService = authService;
     }
 
-    /**
-     * Đăng nhập người dùng
-     */
     @PostMapping("/login")
-    public ResponseEntity<ApiResponse<LoginResponse>> login(@Valid @RequestBody LoginRequest loginRequest) {
+    public ResponseEntity<ResponseWrapper<LoginResponse>> login(@Valid @RequestBody LoginRequest loginRequest) {
         LoginResponse loginResponse = authService.login(loginRequest);
-        return ResponseEntity.ok(ApiResponse.success("Đăng nhập thành công", loginResponse));
+        return ResponseEntity.ok(ResponseWrapper.success("Đăng nhập thành công", loginResponse));
     }
 
-    /**
-     * Đăng ký người dùng mới
-     */
+
     @PostMapping("/register")
-    public ResponseEntity<ApiResponse<UserDTO>> register(@Valid @RequestBody UserCreateDTO registerRequest) {
+    public ResponseEntity<ResponseWrapper<UserDTO>> register(@Valid @RequestBody UserCreateDTO registerRequest) {
         UserDTO userDTO = authService.register(registerRequest);
         return new ResponseEntity<>(
-                ApiResponse.success("Đăng ký thành công", userDTO),
+                ResponseWrapper.success("Đăng ký thành công", userDTO),
                 HttpStatus.CREATED);
     }
 
-    /**
-     * Lấy thông tin người dùng hiện tại
-     */
+
     @GetMapping("/me")
-    public ResponseEntity<ApiResponse<UserDTO>> getCurrentUser() {
+    public ResponseEntity<ResponseWrapper<UserDTO>> getCurrentUser() {
         UserDTO userDTO = authService.getCurrentUser();
         if (userDTO != null) {
-            return ResponseEntity.ok(ApiResponse.success("User information retrieved successfully", userDTO));
+            return ResponseEntity.ok(ResponseWrapper.success("User information retrieved successfully", userDTO));
         } else {
-            // Tạo đối tượng ApiResponse<UserDTO> với data là null
-            ApiResponse<UserDTO> response = new ApiResponse<>(false, "User not authenticated", null);
+            // Tạo đối tượng ResponseWrapper<UserDTO> với data là null
+            ResponseWrapper<UserDTO> response = new ResponseWrapper<>(false, "User not authenticated", null);
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(response);
         }
     }
 
-    /**
-     * Đăng xuất
-     */
+
     @PostMapping("/logout")
-    public ResponseEntity<ApiResponse<?>> logout() {
+    public ResponseEntity<ResponseWrapper<?>> logout() {
         // Xóa Authentication khỏi SecurityContext
         SecurityContextHolder.clearContext();
-        return ResponseEntity.ok(ApiResponse.success("Đăng xuất thành công"));
+        return ResponseEntity.ok(ResponseWrapper.success("Đăng xuất thành công"));
     }
 
-    /**
-     * Kiểm tra token có hợp lệ không
-     */
+
     @GetMapping("/validate-token")
-    public ResponseEntity<ApiResponse<Boolean>> validateToken() {
+    public ResponseEntity<ResponseWrapper<Boolean>> validateToken() {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         boolean isValid = authentication != null && authentication.isAuthenticated()
                 && !authentication.getPrincipal().equals("anonymousUser");
-        return ResponseEntity.ok(ApiResponse.success("Token validation status", isValid));
+        return ResponseEntity.ok(ResponseWrapper.success("Token validation status", isValid));
     }
 }

@@ -1,6 +1,6 @@
 package com.example.app.controller;
 
-import com.example.app.dto.ApiResponse;
+import com.example.app.dto.ResponseWrapper;
 import com.example.app.dto.PagedResponse;
 import com.example.app.dto.ReviewDTO;
 import com.example.app.service.ReviewService;
@@ -30,47 +30,47 @@ public class ReviewController {
      * Lấy danh sách đánh giá của một sản phẩm
      */
     @GetMapping("/product/{productId}")
-    public ResponseEntity<ApiResponse<PagedResponse<ReviewDTO>>> getReviewsByProduct(
+    public ResponseEntity<ResponseWrapper<PagedResponse<ReviewDTO>>> getReviewsByProduct(
             @PathVariable Integer productId,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size) {
 
         PagedResponse<ReviewDTO> reviews = reviewService.getReviewsByProduct(productId, page, size);
-        return ResponseEntity.ok(ApiResponse.success("Product reviews retrieved successfully", reviews));
+        return ResponseEntity.ok(ResponseWrapper.success("Product reviews retrieved successfully", reviews));
     }
 
     /**
      * Lấy các đánh giá gần đây của một sản phẩm
      */
     @GetMapping("/product/{productId}/recent")
-    public ResponseEntity<ApiResponse<List<ReviewDTO>>> getRecentReviews(
+    public ResponseEntity<ResponseWrapper<List<ReviewDTO>>> getRecentReviews(
             @PathVariable Integer productId,
             @RequestParam(defaultValue = "5") int limit) {
 
         List<ReviewDTO> reviews = reviewService.getRecentReviews(productId, limit);
-        return ResponseEntity.ok(ApiResponse.success("Recent reviews retrieved successfully", reviews));
+        return ResponseEntity.ok(ResponseWrapper.success("Recent reviews retrieved successfully", reviews));
     }
 
     /**
      * Tính điểm đánh giá trung bình của một sản phẩm
      */
     @GetMapping("/product/{productId}/average")
-    public ResponseEntity<ApiResponse<Double>> getAverageRating(@PathVariable Integer productId) {
+    public ResponseEntity<ResponseWrapper<Double>> getAverageRating(@PathVariable Integer productId) {
         Double averageRating = reviewService.calculateAverageRating(productId);
-        return ResponseEntity.ok(ApiResponse.success("Average rating retrieved successfully", averageRating));
+        return ResponseEntity.ok(ResponseWrapper.success("Average rating retrieved successfully", averageRating));
     }
 
     /**
      * Lấy danh sách đánh giá của người dùng hiện tại
      */
     @GetMapping("/my-reviews")
-    public ResponseEntity<ApiResponse<List<ReviewDTO>>> getMyReviews() {
+    public ResponseEntity<ResponseWrapper<List<ReviewDTO>>> getMyReviews() {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         String username = authentication.getName();
 
         // Lấy ID người dùng từ username (thực hiện trong ReviewService)
         List<ReviewDTO> reviews = reviewService.getReviewsByCurrentUser(username);
-        return ResponseEntity.ok(ApiResponse.success("Your reviews retrieved successfully", reviews));
+        return ResponseEntity.ok(ResponseWrapper.success("Your reviews retrieved successfully", reviews));
     }
 
     /**
@@ -78,18 +78,18 @@ public class ReviewController {
      */
     @GetMapping("/user/{userId}")
     @PreAuthorize("hasRole('ADMIN') or @userSecurity.isCurrentUser(#userId)")
-    public ResponseEntity<ApiResponse<List<ReviewDTO>>> getReviewsByUser(@PathVariable Integer userId) {
+    public ResponseEntity<ResponseWrapper<List<ReviewDTO>>> getReviewsByUser(@PathVariable Integer userId) {
         List<ReviewDTO> reviews = reviewService.getReviewsByUser(userId);
-        return ResponseEntity.ok(ApiResponse.success("User reviews retrieved successfully", reviews));
+        return ResponseEntity.ok(ResponseWrapper.success("User reviews retrieved successfully", reviews));
     }
 
     /**
      * Lấy chi tiết một đánh giá theo ID
      */
     @GetMapping("/{id}")
-    public ResponseEntity<ApiResponse<ReviewDTO>> getReviewById(@PathVariable Integer id) {
+    public ResponseEntity<ResponseWrapper<ReviewDTO>> getReviewById(@PathVariable Integer id) {
         ReviewDTO review = reviewService.getReviewById(id);
-        return ResponseEntity.ok(ApiResponse.success("Review retrieved successfully", review));
+        return ResponseEntity.ok(ResponseWrapper.success("Review retrieved successfully", review));
     }
 
     /**
@@ -97,14 +97,14 @@ public class ReviewController {
      */
     @PostMapping
     @PreAuthorize("isAuthenticated()")
-    public ResponseEntity<ApiResponse<ReviewDTO>> createReview(@Valid @RequestBody ReviewDTO reviewDTO) {
+    public ResponseEntity<ResponseWrapper<ReviewDTO>> createReview(@Valid @RequestBody ReviewDTO reviewDTO) {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         String username = authentication.getName();
 
         // Đảm bảo reviewDTO.userId trùng với người dùng hiện tại
         ReviewDTO createdReview = reviewService.createReviewByCurrentUser(username, reviewDTO);
         return new ResponseEntity<>(
-                ApiResponse.success("Review created successfully", createdReview),
+                ResponseWrapper.success("Review created successfully", createdReview),
                 HttpStatus.CREATED);
     }
 
@@ -113,7 +113,7 @@ public class ReviewController {
      */
     @PutMapping("/{id}")
     @PreAuthorize("isAuthenticated() and @reviewSecurity.isAuthor(#id)")
-    public ResponseEntity<ApiResponse<ReviewDTO>> updateReview(
+    public ResponseEntity<ResponseWrapper<ReviewDTO>> updateReview(
             @PathVariable Integer id,
             @Valid @RequestBody ReviewDTO reviewDTO) {
 
@@ -121,7 +121,7 @@ public class ReviewController {
         String username = authentication.getName();
 
         ReviewDTO updatedReview = reviewService.updateReviewByCurrentUser(id, username, reviewDTO);
-        return ResponseEntity.ok(ApiResponse.success("Review updated successfully", updatedReview));
+        return ResponseEntity.ok(ResponseWrapper.success("Review updated successfully", updatedReview));
     }
 
     /**
@@ -129,8 +129,8 @@ public class ReviewController {
      */
     @DeleteMapping("/{id}")
     @PreAuthorize("hasRole('ADMIN') or @reviewSecurity.isAuthor(#id)")
-    public ResponseEntity<ApiResponse<?>> deleteReview(@PathVariable Integer id) {
+    public ResponseEntity<ResponseWrapper<?>> deleteReview(@PathVariable Integer id) {
         reviewService.deleteReview(id);
-        return ResponseEntity.ok(ApiResponse.success("Review deleted successfully"));
+        return ResponseEntity.ok(ResponseWrapper.success("Review deleted successfully"));
     }
 }

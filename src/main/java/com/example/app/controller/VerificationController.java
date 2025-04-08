@@ -1,9 +1,9 @@
 package com.example.app.controller;
 
+import com.example.app.dto.ResponseWrapper;
 import com.example.app.entity.User;
 import com.example.app.entity.VerificationToken;
 import com.example.app.repository.UserRepository;
-import com.example.app.dto.ApiResponse;
 import com.example.app.service.VerificationTokenService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
@@ -28,11 +28,11 @@ public class VerificationController {
 
     @GetMapping("/verify")
     @Transactional
-    public ResponseEntity<ApiResponse<?>> verifyEmail(@RequestParam("token") String token) {
+    public ResponseEntity<ResponseWrapper<?>> verifyEmail(@RequestParam("token") String token) {
         // Kiểm tra token có hợp lệ không
         if (!tokenService.validateToken(token)) {
             return ResponseEntity.badRequest()
-                    .body(new ApiResponse<>(false, "Token xác thực không hợp lệ hoặc đã hết hạn", null));
+                    .body(new ResponseWrapper<>(false, "Token xác thực không hợp lệ hoặc đã hết hạn", null));
         }
 
         // Lấy token từ database
@@ -48,14 +48,14 @@ public class VerificationController {
         tokenService.markTokenAsUsed(token);
 
         return ResponseEntity.ok()
-                .body(new ApiResponse<>(true, "Xác thực emails thành công", null));
+                .body(new ResponseWrapper<>(true, "Xác thực emails thành công", null));
     }
 
     @GetMapping("/resend-verification")
-    public ResponseEntity<ApiResponse<?>> resendVerification(@RequestParam("email") String email) {
+    public ResponseEntity<ResponseWrapper<?>> resendVerification(@RequestParam("email") String email) {
         // TODO: Triển khai logic để gửi lại emails xác thực
 
         return ResponseEntity.ok()
-                .body(new ApiResponse<>(true, "Email xác thực đã được gửi lại", null));
+                .body(new ResponseWrapper<>(true, "Email xác thực đã được gửi lại", null));
     }
 }

@@ -1,9 +1,8 @@
 package com.example.app.controller;
-import com.example.app.dto.ApiResponse;
+import com.example.app.dto.ResponseWrapper;
 import com.example.app.dto.ProductImageDTO;
 import com.example.app.service.FileStorageService;
 import com.example.app.service.ProductImageService;
-import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
@@ -40,7 +39,7 @@ public class ProductImageController {
      */
     @PostMapping(value = "/upload/{productId}", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<ApiResponse<List<ProductImageDTO>>> uploadProductImages(
+    public ResponseEntity<ResponseWrapper<List<ProductImageDTO>>> uploadProductImages(
             @PathVariable Integer productId,
             @RequestParam("files") MultipartFile[] files,
             @RequestParam(value = "variantId", required = false) Integer variantId,
@@ -66,13 +65,13 @@ public class ProductImageController {
             }
 
             return new ResponseEntity<>(
-                    ApiResponse.success("Images uploaded successfully", uploadedImages),
+                    ResponseWrapper.success("Images uploaded successfully", uploadedImages),
                     HttpStatus.CREATED
             );
 
         } catch (IOException e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(new ApiResponse<List<ProductImageDTO>>(false, "Failed to upload images: " + e.getMessage(), null));
+                    .body(new ResponseWrapper<List<ProductImageDTO>>(false, "Failed to upload images: " + e.getMessage(), null));
         }
     }
 
@@ -80,9 +79,9 @@ public class ProductImageController {
      * Lấy tất cả hình ảnh của sản phẩm kèm thông tin biến thể
      */
     @GetMapping("/product/{productId}/all")
-    public ResponseEntity<ApiResponse<List<ProductImageDTO>>> getAllProductImages(@PathVariable Integer productId) {
+    public ResponseEntity<ResponseWrapper<List<ProductImageDTO>>> getAllProductImages(@PathVariable Integer productId) {
         List<ProductImageDTO> allImages = productImageService.getAllProductImages(productId);
-        return ResponseEntity.ok(ApiResponse.success("All product images retrieved successfully", allImages));
+        return ResponseEntity.ok(ResponseWrapper.success("All product images retrieved successfully", allImages));
     }
 
     /**
@@ -90,7 +89,7 @@ public class ProductImageController {
      */
     @PostMapping(value = "/upload/variant/{variantId}", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<ApiResponse<ProductImageDTO>> uploadVariantImage(
+    public ResponseEntity<ResponseWrapper<ProductImageDTO>> uploadVariantImage(
             @PathVariable Integer variantId,
             @RequestParam("file") MultipartFile file,
             @RequestParam("productId") Integer productId) {
@@ -110,7 +109,7 @@ public class ProductImageController {
             ProductImageDTO savedImage = productImageService.createImage(imageDTO);
 
             return new ResponseEntity<>(
-                    ApiResponse.success("Variant image uploaded successfully", savedImage),
+                    ResponseWrapper.success("Variant image uploaded successfully", savedImage),
                     HttpStatus.CREATED
             );
             //bug
@@ -118,7 +117,7 @@ public class ProductImageController {
 
         } catch (IOException e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(new ApiResponse<ProductImageDTO>(false, "Failed to upload variant image: " + e.getMessage(), null));
+                    .body(new ResponseWrapper<ProductImageDTO>(false, "Failed to upload variant image: " + e.getMessage(), null));
         }
     }
 
@@ -127,17 +126,17 @@ public class ProductImageController {
      */
     @DeleteMapping("/file/{id}")
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<ApiResponse<?>> deleteImageWithFile(@PathVariable Integer id) {
+    public ResponseEntity<ResponseWrapper<?>> deleteImageWithFile(@PathVariable Integer id) {
         try {
             ProductImageDTO image = productImageService.getImageById(id);
             // Xóa file vật lý
             fileStorageService.deleteFile(image.getImageURL());
             // Xóa record trong database
             productImageService.deleteImage(id);
-            return ResponseEntity.ok(ApiResponse.success("Image and file deleted successfully"));
+            return ResponseEntity.ok(ResponseWrapper.success("Image and file deleted successfully"));
         } catch (IOException e) {
             return new ResponseEntity<>(
-                    ApiResponse.error("Failed to delete image file: " + e.getMessage()),
+                    ResponseWrapper.error("Failed to delete image file: " + e.getMessage()),
                     HttpStatus.INTERNAL_SERVER_ERROR
             );
         }

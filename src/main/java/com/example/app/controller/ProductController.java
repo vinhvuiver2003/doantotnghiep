@@ -1,8 +1,15 @@
 package com.example.app.controller;
-import com.example.app.dto.ApiResponse;
+import com.example.app.dto.ResponseWrapper;
 import com.example.app.dto.PagedResponse;
 import com.example.app.dto.ProductDTO;
 import com.example.app.service.ProductService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.Schema;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
@@ -15,6 +22,7 @@ import java.util.List;
 
 @RestController
 @RequestMapping("/api/products")
+@Tag(name = "Sản phẩm", description = "API quản lý sản phẩm")
 public class ProductController {
 
     private final ProductService productService;
@@ -27,33 +35,53 @@ public class ProductController {
     /**
      * Lấy danh sách tất cả sản phẩm với phân trang
      */
+    @Operation(
+            summary = "Lấy danh sách sản phẩm có phân trang",
+            description = "Trả về danh sách sản phẩm phân trang theo các tiêu chí sắp xếp"
+    )
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Lấy danh sách sản phẩm thành công",
+                    content = @Content(mediaType = "application/json",
+                            schema = @Schema(implementation = ResponseWrapper.class))),
+            @ApiResponse(responseCode = "500", description = "Lỗi server khi lấy danh sách sản phẩm"),
+    })
     @GetMapping
     public ResponseEntity<?> getAllProducts(
-            @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "12") int size,
-            @RequestParam(defaultValue = "id") String sortBy,
-            @RequestParam(defaultValue = "desc") String sortDir) {
+            @Parameter(description = "Số trang (bắt đầu từ 0)") @RequestParam(defaultValue = "0") int page,
+            @Parameter(description = "Số sản phẩm trên mỗi trang") @RequestParam(defaultValue = "12") int size,
+            @Parameter(description = "Sắp xếp theo trường") @RequestParam(defaultValue = "id") String sortBy,
+            @Parameter(description = "Chiều sắp xếp (asc hoặc desc)") @RequestParam(defaultValue = "desc") String sortDir) {
 
         try {
             PagedResponse<ProductDTO> products = productService.getAllProducts(page, size, sortBy, sortDir);
-            return ResponseEntity.ok(ApiResponse.success("Products retrieved successfully", products));
+            return ResponseEntity.ok(ResponseWrapper.success("Products retrieved successfully", products));
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(ApiResponse.error("Error retrieving products: " + e.getMessage()));
+                    .body(ResponseWrapper.error("Error retrieving products: " + e.getMessage()));
         }
     }
 
     /**
      * Lấy thông tin chi tiết một sản phẩm theo ID
      */
+    @Operation(
+            summary = "Lấy thông tin sản phẩm theo ID",
+            description = "Trả về thông tin chi tiết của sản phẩm theo ID cung cấp"
+    )
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Lấy thông tin sản phẩm thành công"),
+            @ApiResponse(responseCode = "404", description = "Không tìm thấy sản phẩm với ID cung cấp"),
+            @ApiResponse(responseCode = "500", description = "Lỗi server khi lấy thông tin sản phẩm")
+    })
     @GetMapping("/{id}")
-    public ResponseEntity<?> getProductById(@PathVariable Integer id) {
+    public ResponseEntity<?> getProductById(
+            @Parameter(description = "ID của sản phẩm") @PathVariable Integer id) {
         try {
             ProductDTO product = productService.getProductById(id);
-            return ResponseEntity.ok(ApiResponse.success("Product retrieved successfully", product));
+            return ResponseEntity.ok(ResponseWrapper.success("Product retrieved successfully", product));
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(ApiResponse.error("Error retrieving product: " + e.getMessage()));
+                    .body(ResponseWrapper.error("Error retrieving product: " + e.getMessage()));
         }
     }
 
@@ -70,10 +98,10 @@ public class ProductController {
 
         try {
             PagedResponse<ProductDTO> products = productService.getProductsByCategory(categoryId, page, size, sortBy, sortDir);
-            return ResponseEntity.ok(ApiResponse.success("Products by category retrieved successfully", products));
+            return ResponseEntity.ok(ResponseWrapper.success("Products by category retrieved successfully", products));
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(ApiResponse.error("Error retrieving products by category: " + e.getMessage()));
+                    .body(ResponseWrapper.error("Error retrieving products by category: " + e.getMessage()));
         }
     }
 
@@ -90,10 +118,10 @@ public class ProductController {
 
         try {
             PagedResponse<ProductDTO> products = productService.getProductsByBrand(brandId, page, size, sortBy, sortDir);
-            return ResponseEntity.ok(ApiResponse.success("Products by brand retrieved successfully", products));
+            return ResponseEntity.ok(ResponseWrapper.success("Products by brand retrieved successfully", products));
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(ApiResponse.error("Error retrieving products by brand: " + e.getMessage()));
+                    .body(ResponseWrapper.error("Error retrieving products by brand: " + e.getMessage()));
         }
     }
 
@@ -110,10 +138,10 @@ public class ProductController {
 
         try {
             PagedResponse<ProductDTO> products = productService.searchProducts(keyword, page, size, sortBy, sortDir);
-            return ResponseEntity.ok(ApiResponse.success("Search results", products));
+            return ResponseEntity.ok(ResponseWrapper.success("Search results", products));
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(ApiResponse.error("Error searching products: " + e.getMessage()));
+                    .body(ResponseWrapper.error("Error searching products: " + e.getMessage()));
         }
     }
 
@@ -131,10 +159,10 @@ public class ProductController {
 
         try {
             PagedResponse<ProductDTO> products = productService.filterProductsByPrice(minPrice, maxPrice, page, size, sortBy, sortDir);
-            return ResponseEntity.ok(ApiResponse.success("Price filtered results", products));
+            return ResponseEntity.ok(ResponseWrapper.success("Price filtered results", products));
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(ApiResponse.error("Error filtering products by price: " + e.getMessage()));
+                    .body(ResponseWrapper.error("Error filtering products by price: " + e.getMessage()));
         }
     }
 
@@ -147,10 +175,10 @@ public class ProductController {
 
         try {
             List<ProductDTO> products = productService.getNewArrivals(limit);
-            return ResponseEntity.ok(ApiResponse.success("New arrivals retrieved successfully", products));
+            return ResponseEntity.ok(ResponseWrapper.success("New arrivals retrieved successfully", products));
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(ApiResponse.error("Error retrieving new arrivals: " + e.getMessage()));
+                    .body(ResponseWrapper.error("Error retrieving new arrivals: " + e.getMessage()));
         }
     }
 
@@ -163,10 +191,10 @@ public class ProductController {
 
         try {
             List<ProductDTO> products = productService.getTopRatedProducts(limit);
-            return ResponseEntity.ok(ApiResponse.success("Top rated products retrieved successfully", products));
+            return ResponseEntity.ok(ResponseWrapper.success("Top rated products retrieved successfully", products));
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(ApiResponse.error("Error retrieving top rated products: " + e.getMessage()));
+                    .body(ResponseWrapper.error("Error retrieving top rated products: " + e.getMessage()));
         }
     }
 
@@ -180,10 +208,10 @@ public class ProductController {
 
         try {
             List<ProductDTO> products = productService.getLowStockProducts(threshold);
-            return ResponseEntity.ok(ApiResponse.success("Low stock products retrieved successfully", products));
+            return ResponseEntity.ok(ResponseWrapper.success("Low stock products retrieved successfully", products));
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(ApiResponse.error("Error retrieving low stock products: " + e.getMessage()));
+                    .body(ResponseWrapper.error("Error retrieving low stock products: " + e.getMessage()));
         }
     }
 
@@ -196,11 +224,11 @@ public class ProductController {
         try {
             ProductDTO createdProduct = productService.createProduct(productDTO);
             return new ResponseEntity<>(
-                    ApiResponse.success("Product created successfully", createdProduct),
+                    ResponseWrapper.success("Product created successfully", createdProduct),
                     HttpStatus.CREATED);
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(ApiResponse.error("Error creating product: " + e.getMessage()));
+                    .body(ResponseWrapper.error("Error creating product: " + e.getMessage()));
         }
     }
 
@@ -215,10 +243,10 @@ public class ProductController {
 
         try {
             ProductDTO updatedProduct = productService.updateProduct(id, productDTO);
-            return ResponseEntity.ok(ApiResponse.success("Product updated successfully", updatedProduct));
+            return ResponseEntity.ok(ResponseWrapper.success("Product updated successfully", updatedProduct));
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(ApiResponse.error("Error updating product: " + e.getMessage()));
+                    .body(ResponseWrapper.error("Error updating product: " + e.getMessage()));
         }
     }
 
@@ -230,10 +258,10 @@ public class ProductController {
     public ResponseEntity<?> deleteProduct(@PathVariable Integer id) {
         try {
             productService.deleteProduct(id);
-            return ResponseEntity.ok(ApiResponse.success("Product deleted successfully"));
+            return ResponseEntity.ok(ResponseWrapper.success("Product deleted successfully"));
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(ApiResponse.error("Error deleting product: " + e.getMessage()));
+                    .body(ResponseWrapper.error("Error deleting product: " + e.getMessage()));
         }
     }
 

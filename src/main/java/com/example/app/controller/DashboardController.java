@@ -1,6 +1,6 @@
 package com.example.app.controller;
 
-import com.example.app.dto.ApiResponse;
+import com.example.app.dto.ResponseWrapper;
 import com.example.app.dto.DashboardStatsDTO;
 import com.example.app.service.DashboardStatsService;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -28,28 +28,28 @@ public class DashboardController {
      * Lấy thống kê tổng quan (mặc định là tháng hiện tại)
      */
     @GetMapping("/stats")
-    public ResponseEntity<ApiResponse<DashboardStatsDTO>> getDashboardStats() {
+    public ResponseEntity<ResponseWrapper<DashboardStatsDTO>> getDashboardStats() {
         DashboardStatsDTO stats = dashboardStatsService.getDashboardStats();
-        return ResponseEntity.ok(ApiResponse.success("Dashboard statistics retrieved successfully", stats));
+        return ResponseEntity.ok(ResponseWrapper.success("Dashboard statistics retrieved successfully", stats));
     }
 
     /**
      * Lấy thống kê theo khoảng thời gian
      */
     @GetMapping("/stats/date-range")
-    public ResponseEntity<ApiResponse<DashboardStatsDTO>> getDashboardStatsByDateRange(
+    public ResponseEntity<ResponseWrapper<DashboardStatsDTO>> getDashboardStatsByDateRange(
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime startDate,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime endDate) {
 
         DashboardStatsDTO stats = dashboardStatsService.getDashboardStatsByDateRange(startDate, endDate);
-        return ResponseEntity.ok(ApiResponse.success("Dashboard statistics retrieved successfully", stats));
+        return ResponseEntity.ok(ResponseWrapper.success("Dashboard statistics retrieved successfully", stats));
     }
 
     /**
      * Lấy thống kê bán hàng theo thời gian (ngày, tuần, tháng, năm)
      */
     @GetMapping("/sales/{period}")
-    public ResponseEntity<ApiResponse<Map<String, Object>>> getSalesByPeriod(
+    public ResponseEntity<ResponseWrapper<Map<String, Object>>> getSalesByPeriod(
             @PathVariable String period,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime startDate,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime endDate) {
@@ -68,6 +68,6 @@ public class DashboardController {
         }
 
         Map<String, Object> salesStats = dashboardStatsService.getSalesStatistics(startDate, endDate);
-        return ResponseEntity.ok(ApiResponse.success("Sales statistics retrieved successfully", salesStats));
+        return ResponseEntity.ok(ResponseWrapper.success("Sales statistics retrieved successfully", salesStats));
     }
 }
