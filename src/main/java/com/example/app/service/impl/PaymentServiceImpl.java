@@ -29,37 +29,17 @@ public class PaymentServiceImpl implements PaymentService {
     private final PaymentRepository paymentRepository;
     private final OrderRepository orderRepository;
 
-    // VNPay configuration (deprecated)
-    @Value("${vnpay.terminal-id:}")
+    @Value("${vnpay.terminal-id}")
     private String vnpTerminalId;
 
-    @Value("${vnpay.secret-key:}")
+    @Value("${vnpay.secret-key}")
     private String vnpSecretKey;
 
-    @Value("${vnpay.payment-url:}")
+    @Value("${vnpay.payment-url}")
     private String vnpPaymentUrl;
 
-    @Value("${vnpay.return-url:}")
+    @Value("${vnpay.return-url}")
     private String vnpReturnUrl;
-
-    // SePay configuration
-    @Value("${sepay.merchant-id}")
-    private String sepayMerchantId;
-
-    @Value("${sepay.api-key}")
-    private String sepayApiKey;
-
-    @Value("${sepay.secret-key}")
-    private String sepaySecretKey;
-
-    @Value("${sepay.payment-url}")
-    private String sepayPaymentUrl;
-
-    @Value("${sepay.return-url}")
-    private String sepayReturnUrl;
-
-    @Value("${sepay.ipn-url}")
-    private String sepayIpnUrl;
 
     @Value("${app.base-url}")
     private String appBaseUrl;
@@ -465,261 +445,18 @@ public class PaymentServiceImpl implements PaymentService {
         return errorMessages.getOrDefault(responseCode, "Lỗi không xác định");
     }
 
-    // Triển khai các phương thức SePay
-
-    @Override
-    @Transactional
-    public String createSePayPaymentUrl(Integer orderId, String paymentMethod, HttpServletRequest request) {
-        // Lấy thông tin đơn hàng
-        Order order = orderRepository.findById(orderId)
-                .orElseThrow(() -> new ResourceNotFoundException("Order not found with id: " + orderId));
-
-        // Kiểm tra xem đã có thanh toán chưa
-        Optional<Payment> existingPayment = paymentRepository.findByOrderId(orderId);
-        Payment payment;
-
-        if (existingPayment.isPresent()) {
-            payment = existingPayment.get();
-            // Nếu đã thanh toán thành công, không tạo URL mới
-            if (payment.getStatus() == Payment.PaymentStatus.completed) {
-                throw new IllegalArgumentException("Order has already been paid");
-            }
-        } else {
-            // Tạo mới payment
-            payment = new Payment();
-            payment.setOrder(order);
-            payment.setStatus(Payment.PaymentStatus.pending);
-            payment.setAmount(order.getFinalAmount());
-            payment = paymentRepository.save(payment);
-        }
-
-        // Lấy IP của client
-        String ipAddr = getIpAddress(request);
-
-        // Tạo tham số cho SePay
-        Map<String, String> sepayParams = new HashMap<>();
-        sepayParams.put("merchant_id", sepayMerchantId);
-        sepayParams.put("order_id", order.getId().toString());
-        sepayParams.put("amount", order.getFinalAmount().toString());
-        sepayParams.put("currency", "VND");
-        sepayParams.put("order_desc", "Thanh toan don hang #" + order.getId());
-        sepayParams.put("return_url", appBaseUrl + sepayReturnUrl);
-        sepayParams.put("notify_url", appBaseUrl + sepayIpnUrl);
-        sepayParams.put("client_ip", ipAddr);
-        sepayParams.put("payment_method", paymentMethod != null ? paymentMethod : "ALL"); // ATM, CC, EWALLET, ALL
-        
-        // Thêm timestamp
-        String timestamp = String.valueOf(System.currentTimeMillis() / 1000);
-        sepayParams.put("timestamp", timestamp);
-
-        // Tạo chữ ký
-        String signData = createSignatureData(sepayParams);
-        String signature = generateHmacSHA256(signData, sepaySecretKey);
-        sepayParams.put("signature", signature);
-
-        // Tạo URL thanh toán
-        return buildSePayUrl(sepayParams);
-    }
-
-    @Override
-    @Transactional
-    public Map<String, String> processSePayCallback(Map<String, String> queryParams, HttpServletRequest request) {
-        Map<String, String> result = new HashMap<>();
-
-        // Xác thực chữ ký từ SePay
-        if (!validateSePaySignature(queryParams)) {
-            result.put("success", "false");
-            result.put("message", "Invalid signature");
-            return result;
-        }
-
-        // Lấy thông tin thanh toán
-        String status = queryParams.get("status");
-        String orderId = queryParams.get("order_id");
-        String amount = queryParams.get("amount");
-        String transactionId = queryParams.get("transaction_id");
-
-        // Lấy thông tin đơn hàng
-        Order order = orderRepository.findById(Integer.parseInt(orderId))
-                .orElseThrow(() -> new ResourceNotFoundException("Order not found with id: " + orderId));
-
-        // Lấy hoặc tạo payment
-        Payment payment = paymentRepository.findByOrderId(Integer.parseInt(orderId))
-                .orElseGet(() -> {
-                    Payment newPayment = new Payment();
-                    newPayment.setOrder(order);
-                    newPayment.setAmount(order.getFinalAmount());
-                    return newPayment;
-                });
-
-        // Cập nhật trạng thái thanh toán
-        if ("success".equals(status)) {
-            payment.setStatus(Payment.PaymentStatus.completed);
-            payment.setPaymentDate(LocalDateTime.now());
-            
-            // Cập nhật trạng thái đơn hàng
-            order.setOrderStatus(Order.OrderStatus.processing);
-            orderRepository.save(order);
-            
-            result.put("success", "true");
-            result.put("message", "Payment successful");
-        } else {
-            payment.setStatus(Payment.PaymentStatus.failed);
-            result.put("success", "false");
-            result.put("message", "Payment failed: " + status);
-        }
-
-        // Lưu thông tin giao dịch
-        payment.setBankTransferCode(transactionId);
-        payment.setBankAccount(queryParams.get("payment_method")); // Lưu phương thức thanh toán
-        paymentRepository.save(payment);
-
-        // Thêm thông tin kết quả
-        result.put("orderId", orderId);
-        result.put("amount", amount);
-        result.put("paymentDate", payment.getPaymentDate() != null ? payment.getPaymentDate().toString() : "");
-        result.put("paymentMethod", "SePay");
-        result.put("transactionNo", transactionId);
-
-        return result;
-    }
-
-    @Override
-    public boolean verifySePayIpn(Map<String, String> queryParams) {
-        // Xác thực chữ ký từ SePay IPN
-        if (!validateSePaySignature(queryParams)) {
-            return false;
-        }
-
-        String status = queryParams.get("status");
-        String orderId = queryParams.get("order_id");
-        String amount = queryParams.get("amount");
-        String transactionId = queryParams.get("transaction_id");
-
-        try {
-            Order order = orderRepository.findById(Integer.parseInt(orderId))
-                    .orElseThrow(() -> new ResourceNotFoundException("Order not found with id: " + orderId));
-
-            Payment payment = paymentRepository.findByOrderId(Integer.parseInt(orderId))
-                    .orElseGet(() -> {
-                        Payment newPayment = new Payment();
-                        newPayment.setOrder(order);
-                        newPayment.setAmount(order.getFinalAmount());
-                        return newPayment;
-                    });
-
-            if ("success".equals(status)) {
-                payment.setStatus(Payment.PaymentStatus.completed);
-                payment.setPaymentDate(LocalDateTime.now());
-                payment.setBankTransferCode(transactionId);
-                payment.setBankAccount(queryParams.get("payment_method"));
-
-                // Cập nhật trạng thái đơn hàng
-                order.setOrderStatus(Order.OrderStatus.processing);
-                orderRepository.save(order);
-            } else {
-                payment.setStatus(Payment.PaymentStatus.failed);
-            }
-
-            paymentRepository.save(payment);
-            return true;
-        } catch (Exception e) {
-            return false;
-        }
-    }
-
-    // Phương thức hỗ trợ cho SePay
-    private String createSignatureData(Map<String, String> params) {
-        // Sắp xếp các tham số theo thứ tự
-        List<String> keys = new ArrayList<>(params.keySet());
-        Collections.sort(keys);
-
-        StringBuilder data = new StringBuilder();
-        for (String key : keys) {
-            // Không bao gồm trường signature
-            if (!"signature".equals(key)) {
-                data.append(key).append("=").append(params.get(key)).append("&");
-            }
-        }
-
-        // Xóa dấu & cuối cùng
-        if (data.length() > 0) {
-            data.deleteCharAt(data.length() - 1);
-        }
-
-        return data.toString();
-    }
-
-    private String generateHmacSHA256(String data, String key) {
-        try {
-            Mac sha256_HMAC = Mac.getInstance("HmacSHA256");
-            SecretKeySpec secret_key = new SecretKeySpec(key.getBytes(StandardCharsets.UTF_8), "HmacSHA256");
-            sha256_HMAC.init(secret_key);
-
-            byte[] hash = sha256_HMAC.doFinal(data.getBytes(StandardCharsets.UTF_8));
-            return bytesToHex(hash);
-        } catch (Exception e) {
-            throw new RuntimeException("Failed to generate HMAC-SHA256", e);
-        }
-    }
-
-    private String bytesToHex(byte[] bytes) {
-        StringBuilder result = new StringBuilder();
-        for (byte b : bytes) {
-            result.append(String.format("%02x", b));
-        }
-        return result.toString();
-    }
-
-    private boolean validateSePaySignature(Map<String, String> params) {
-        String receivedSignature = params.get("signature");
-        if (receivedSignature == null) {
-            return false;
-        }
-
-        // Tạo bản đồ mới không chứa signature
-        Map<String, String> signParams = new HashMap<>(params);
-        signParams.remove("signature");
-
-        // Tạo dữ liệu chữ ký
-        String signData = createSignatureData(signParams);
-        
-        // Tính toán chữ ký
-        String calculatedSignature = generateHmacSHA256(signData, sepaySecretKey);
-        
-        // So sánh với chữ ký nhận được
-        return calculatedSignature.equals(receivedSignature);
-    }
-
-    private String buildSePayUrl(Map<String, String> params) {
-        StringBuilder url = new StringBuilder(sepayPaymentUrl);
-        url.append("?");
-        
-        for (Map.Entry<String, String> entry : params.entrySet()) {
-            url.append(URLEncoder.encode(entry.getKey(), StandardCharsets.UTF_8));
-            url.append("=");
-            url.append(URLEncoder.encode(entry.getValue(), StandardCharsets.UTF_8));
-            url.append("&");
-        }
-        
-        // Xóa dấu & cuối cùng
-        if (url.charAt(url.length() - 1) == '&') {
-            url.deleteCharAt(url.length() - 1);
-        }
-        
-        return url.toString();
-    }
-
     // Utility method to convert Entity to DTO
     private PaymentDTO convertToDTO(Payment payment) {
         PaymentDTO dto = new PaymentDTO();
         dto.setId(payment.getId());
         dto.setOrderId(payment.getOrder().getId());
-        dto.setAmount(payment.getAmount());
         dto.setStatus(payment.getStatus().name());
-        dto.setPaymentDate(payment.getPaymentDate());
-        dto.setBankAccount(payment.getBankAccount());
+        dto.setAmount(payment.getAmount());
         dto.setBankTransferCode(payment.getBankTransferCode());
+        dto.setBankAccount(payment.getBankAccount());
+        dto.setPaymentDate(payment.getPaymentDate());
+        dto.setCreatedAt(payment.getCreatedAt());
+
         return dto;
     }
 }

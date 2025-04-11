@@ -11,6 +11,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
+import java.math.BigDecimal;
 import java.util.Map;
 
 @RestController
@@ -45,12 +46,10 @@ public class PaymentController {
     }
 
     /**
-     * Tạo URL thanh toán cho đơn hàng
-     * @deprecated Sử dụng phương thức createSePayPaymentUrl thay thế
+     * Tạo URL thanh toán VNPay cho đơn hàng
      */
-    @Deprecated
     @PostMapping("/create-payment-url")
-    public ResponseEntity<ResponseWrapper<String>> createVnPayUrl(
+    public ResponseEntity<ResponseWrapper<String>> createPaymentUrl(
             @RequestParam Integer orderId,
             @RequestParam(required = false) String bankCode,
             HttpServletRequest request) {
@@ -60,23 +59,8 @@ public class PaymentController {
     }
 
     /**
-     * Tạo URL thanh toán SePay cho đơn hàng
-     */
-    @PostMapping("/create-sepay-url")
-    public ResponseEntity<ResponseWrapper<String>> createSePayUrl(
-            @RequestParam Integer orderId,
-            @RequestParam(required = false) String paymentMethod,
-            HttpServletRequest request) {
-
-        String paymentUrl = paymentService.createSePayPaymentUrl(orderId, paymentMethod, request);
-        return ResponseEntity.ok(ResponseWrapper.success("SePay payment URL created successfully", paymentUrl));
-    }
-
-    /**
      * Xử lý kết quả thanh toán từ VNPay (Callback)
-     * @deprecated Sử dụng phương thức sePayCallback thay thế
      */
-    @Deprecated
     @GetMapping("/vnpay-return")
     public ResponseEntity<ResponseWrapper<Map<String, String>>> vnPayReturn(
             @RequestParam Map<String, String> queryParams,
@@ -94,46 +78,11 @@ public class PaymentController {
     }
 
     /**
-     * Xử lý kết quả thanh toán từ SePay (Callback)
-     */
-    @GetMapping("/sepay-callback")
-    public ResponseEntity<ResponseWrapper<Map<String, String>>> sePayCallback(
-            @RequestParam Map<String, String> queryParams,
-            HttpServletRequest request) {
-
-        Map<String, String> result = paymentService.processSePayCallback(queryParams, request);
-        boolean isSuccess = Boolean.parseBoolean(result.get("success"));
-
-        if (isSuccess) {
-            return ResponseEntity.ok(ResponseWrapper.success("SePay payment processed successfully", result));
-        } else {
-            ResponseWrapper<Map<String, String>> response = new ResponseWrapper<>(false, result.get("message"), result);
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
-        }
-    }
-
-    /**
      * Xử lý thông báo thanh toán từ VNPay (IPN)
-     * @deprecated Sử dụng phương thức sePayIpn thay thế
      */
-    @Deprecated
     @GetMapping("/vnpay-ipn")
     public ResponseEntity<String> vnPayIpn(@RequestParam Map<String, String> queryParams) {
         boolean verified = paymentService.verifyVnPayIpn(queryParams);
-
-        if (verified) {
-            return ResponseEntity.ok("OK");
-        } else {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("FAIL");
-        }
-    }
-
-    /**
-     * Xử lý thông báo thanh toán từ SePay (IPN)
-     */
-    @PostMapping("/sepay-ipn")
-    public ResponseEntity<String> sePayIpn(@RequestBody Map<String, String> queryParams) {
-        boolean verified = paymentService.verifySePayIpn(queryParams);
 
         if (verified) {
             return ResponseEntity.ok("OK");

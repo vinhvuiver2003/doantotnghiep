@@ -111,6 +111,7 @@ public class SecurityConfig {
                                 .requestMatchers("/api/promotions/validate-code").permitAll()
                                 .requestMatchers("/api/promotions/code/**").permitAll()
                                 .requestMatchers("/api/products/top-rated").permitAll()
+                                .requestMatchers("/api/banners/**").permitAll()
                                 .requestMatchers("/api/products/new-arrivals").permitAll()
                                 .requestMatchers("/api/products/best-selling").permitAll()
                                 .requestMatchers("/api/admin/**").hasRole("ADMIN")

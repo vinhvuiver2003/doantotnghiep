@@ -6,8 +6,12 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.core.Authentication;
 
 import java.util.*;
+
+import com.example.app.service.ChatQuestionService;
 
 @Service
 public class ChatbotService {
@@ -15,12 +19,8 @@ public class ChatbotService {
     private static final Logger logger = LoggerFactory.getLogger(ChatbotService.class);
 
     private final RestTemplate restTemplate;
-
-    @Value("${gemini.api.url}")
-    private String apiUrl;
-
-    @Value("${gemini.api.key}")
-    private String apiKey;
+    private final MistralChatService mistralChatService;
+    private final ChatQuestionService chatQuestionService;
 
     @Value("${api.products}")
     private String apiproducts;
@@ -29,152 +29,146 @@ public class ChatbotService {
     private String apipromotions;
 
     @Value("${api.top_rated}")
-    private String apiTopRated = "http://localhost:8080/api/products/top-rated?limit=5";
+    private String apiTopRated;
 
     @Value("${api.new_arrivals}")
-    private String apiNewArrivals = "http://localhost:8080/api/products/new-arrivals?limit=5";
+    private String apiNewArrivals;
 
     @Value("${api.best_selling}")
-    private String apiBestSelling = "http://localhost:8080/api/products/best-selling?limit=5";
+    private String apiBestSelling;
+
+    @Value("${api.categories}")
+    private String apiCategories;
+
+    @Value("${api.brands}")
+    private String apiBrands;
 
     @Value("${chatbot.system.prompt}")
     private String defaultPrompt;
 
-    public ChatbotService(RestTemplate restTemplate) {
+    public ChatbotService(
+        RestTemplate restTemplate, 
+        MistralChatService mistralChatService,
+        ChatQuestionService chatQuestionService
+    ) {
         this.restTemplate = restTemplate;
+        this.mistralChatService = mistralChatService;
+        this.chatQuestionService = chatQuestionService;
+    }
+
+    private HttpHeaders createHeaders() {
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        
+        // Lấy token từ SecurityContext
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication != null && authentication.getCredentials() != null) {
+            String token = authentication.getCredentials().toString();
+            headers.setBearerAuth(token);
+        }
+        
+        return headers;
     }
 
     public String askChatbot(String message) {
-        logger.info("Đang gọi API Gemini...");
-        String fullUrl = apiUrl + "?key=" + apiKey;
+        logger.info("Xử lý yêu cầu chatbot...");
 
-        String productsData = "";
-        String promotionsData = "";
-        String topRatedData = "";
-        String newArrivalsData = "";
-        String bestSellingData = "";
+        // Lưu câu hỏi của người dùng
         try {
-            ResponseEntity<String> extraDataResponse = restTemplate.getForEntity(apiproducts, String.class);
-            if (extraDataResponse.getStatusCode() == HttpStatus.OK) {
-                productsData = extraDataResponse.getBody();
-                logger.info("Dữ liệu bổ sung: {}", productsData);
-            } else {
-                logger.warn("Không thể lấy dữ liệu bổ sung. Mã lỗi: {}", extraDataResponse.getStatusCode());
-            }
-        } catch (Exception ex) {
-            logger.warn("Lỗi khi lấy dữ liệu bổ sung: {}", ex.getMessage());
+            chatQuestionService.saveQuestion(message);
+        } catch (Exception e) {
+            logger.error("Lỗi khi lưu câu hỏi: {}", e.getMessage());
         }
+
+        // Thu thập dữ liệu context
+        StringBuilder context = new StringBuilder(defaultPrompt);
         
         try {
-            ResponseEntity<String> topRatedResponse = restTemplate.getForEntity(apiTopRated, String.class);
+            HttpHeaders headers = createHeaders();
+            HttpEntity<String> requestEntity = new HttpEntity<>(headers);
+
+            // Thêm dữ liệu sản phẩm
+            ResponseEntity<String> productsResponse = restTemplate.exchange(
+                apiproducts, 
+                HttpMethod.GET, 
+                requestEntity, 
+                String.class
+            );
+            if (productsResponse.getStatusCode() == HttpStatus.OK) {
+                context.append("\n\nDữ liệu sản phẩm: ").append(productsResponse.getBody());
+            }
+
+            // Thêm dữ liệu khuyến mãi
+            ResponseEntity<String> promotionsResponse = restTemplate.exchange(
+                apipromotions, 
+                HttpMethod.GET, 
+                requestEntity, 
+                String.class
+            );
+            if (promotionsResponse.getStatusCode() == HttpStatus.OK) {
+                context.append("\n\nKhuyến mãi: ").append(promotionsResponse.getBody());
+            }
+
+            // Thêm sản phẩm đánh giá cao
+            ResponseEntity<String> topRatedResponse = restTemplate.exchange(
+                apiTopRated, 
+                HttpMethod.GET, 
+                requestEntity, 
+                String.class
+            );
             if (topRatedResponse.getStatusCode() == HttpStatus.OK) {
-                topRatedData = topRatedResponse.getBody();
-                logger.info("Dữ liệu sản phẩm đánh giá cao: {}", topRatedData);
-            } else {
-                logger.warn("Không thể lấy dữ liệu đánh giá cao. Mã lỗi: {}", topRatedResponse.getStatusCode());
+                context.append("\n\nSản phẩm đánh giá cao: ").append(topRatedResponse.getBody());
             }
-        } catch (Exception ex) {
-            logger.warn("Lỗi khi lấy dữ liệu đánh giá cao: {}", ex.getMessage());
-        }
-        
-        try {
-            ResponseEntity<String> newArrivalsResponse = restTemplate.getForEntity(apiNewArrivals, String.class);
+
+            // Thêm sản phẩm mới
+            ResponseEntity<String> newArrivalsResponse = restTemplate.exchange(
+                apiNewArrivals, 
+                HttpMethod.GET, 
+                requestEntity, 
+                String.class
+            );
             if (newArrivalsResponse.getStatusCode() == HttpStatus.OK) {
-                newArrivalsData = newArrivalsResponse.getBody();
-                logger.info("Dữ liệu sản phẩm mới: {}", newArrivalsData);
-            } else {
-                logger.warn("Không thể lấy dữ liệu sản phẩm mới. Mã lỗi: {}", newArrivalsResponse.getStatusCode());
+                context.append("\n\nSản phẩm mới: ").append(newArrivalsResponse.getBody());
             }
-        } catch (Exception ex) {
-            logger.warn("Lỗi khi lấy dữ liệu sản phẩm mới: {}", ex.getMessage());
-        }
-        
-        try {
-            ResponseEntity<String> bestSellingResponse = restTemplate.getForEntity(apiBestSelling, String.class);
+
+            // Thêm sản phẩm bán chạy
+            ResponseEntity<String> bestSellingResponse = restTemplate.exchange(
+                apiBestSelling, 
+                HttpMethod.GET, 
+                requestEntity, 
+                String.class
+            );
             if (bestSellingResponse.getStatusCode() == HttpStatus.OK) {
-                bestSellingData = bestSellingResponse.getBody();
-                logger.info("Dữ liệu sản phẩm bán chạy nhất: {}", bestSellingData);
-            } else {
-                logger.warn("Không thể lấy dữ liệu sản phẩm bán chạy. Mã lỗi: {}", bestSellingResponse.getStatusCode());
+                context.append("\n\nSản phẩm bán chạy: ").append(bestSellingResponse.getBody());
             }
-        } catch (Exception ex) {
-            logger.warn("Lỗi khi lấy dữ liệu sản phẩm bán chạy: {}", ex.getMessage());
-        }
-        
-        try {
-            ResponseEntity<String> userResponse = restTemplate.getForEntity(apipromotions, String.class);
-            if (userResponse.getStatusCode() == HttpStatus.OK) {
-                promotionsData = userResponse.getBody();
-                logger.info("Dữ liệu người dùng: {}", promotionsData);
-            } else {
-                logger.warn("Không thể lấy dữ liệu người dùng. Mã lỗi: {}", userResponse.getStatusCode());
+
+            // Thêm danh mục
+            ResponseEntity<String> categoriesResponse = restTemplate.exchange(
+                apiCategories, 
+                HttpMethod.GET, 
+                requestEntity, 
+                String.class
+            );
+            if (categoriesResponse.getStatusCode() == HttpStatus.OK) {
+                context.append("\n\nDanh mục sản phẩm: ").append(categoriesResponse.getBody());
             }
-        } catch (Exception ex) {
-            logger.warn("Lỗi khi lấy dữ liệu người dùng: {}", ex.getMessage());
-        }
-        // 🔧 Thêm dữ liệu bổ sung vào prompt
-        String fullMessage = defaultPrompt + 
-                "\n\nDữ liệu bổ sung: thông tin các sản phẩm: " + productsData + 
-                "\ncác thông tin khuyến mãi: " + promotionsData + 
-                "\nsản phẩm đánh giá cao nhất: " + topRatedData + 
-                "\nsản phẩm mới nhất: " + newArrivalsData + 
-                "\nsản phẩm bán chạy nhất: " + bestSellingData +
-                "\n\nCâu hỏi người dùng: " + message;
 
-
-        // Tạo payload theo định dạng Gemini
-        Map<String, Object> userPart = new HashMap<>();
-        userPart.put("text", fullMessage);
-
-        Map<String, Object> userContent = new HashMap<>();
-        userContent.put("role", "user");
-        userContent.put("parts", List.of(userPart));
-
-        Map<String, Object> payload = new HashMap<>();
-        payload.put("contents", List.of(userContent));
-
-        HttpHeaders headers = new HttpHeaders();
-        headers.setContentType(MediaType.APPLICATION_JSON);
-        headers.set("Accept-Charset", "UTF-8"); // Đảm bảo sử dụng mã hóa UTF-8
-
-
-        HttpEntity<Map<String, Object>> request = new HttpEntity<>(payload, headers);
-
-        try {
-            logger.debug("Gửi POST đến: {}", fullUrl);
-            ResponseEntity<Map> response = restTemplate.postForEntity(fullUrl, request, Map.class);
-
-            if (response.getStatusCode() == HttpStatus.OK && response.getBody() != null) {
-                Map body = response.getBody();
-
-                List<Map<String, Object>> candidates = (List<Map<String, Object>>) body.get("candidates");
-                if (candidates != null && !candidates.isEmpty()) {
-                    Map<String, Object> firstCandidate = candidates.get(0);
-                    Map<String, Object> content = (Map<String, Object>) firstCandidate.get("content");
-
-                    if (content != null) {
-                        List<Map<String, Object>> parts = (List<Map<String, Object>>) content.get("parts");
-                        if (parts != null && !parts.isEmpty() && parts.get(0).containsKey("text")) {
-                            String responseText = (String) parts.get(0).get("text");
-                            logger.info("Phản hồi chatbot: {}", responseText);
-                            return responseText;
-                        }
-                    }
-                }
-
-                logger.warn("Không tìm thấy nội dung phản hồi.");
-                return "Không có phản hồi từ chatbot.";
-            } else if (response.getStatusCode() == HttpStatus.UNAUTHORIZED) {
-                logger.error("Lỗi 401: Unauthorized – API key sai hoặc hết hạn.");
-                return "Lỗi: API key không hợp lệ hoặc hết hạn.";
-            } else {
-                logger.error("Lỗi khi gọi API Gemini: {} - {}", response.getStatusCode(), response.getBody());
-                return "Lỗi khi gọi API Gemini: " + response.getStatusCode();
+            // Thêm thương hiệu
+            ResponseEntity<String> brandsResponse = restTemplate.exchange(
+                apiBrands, 
+                HttpMethod.GET, 
+                requestEntity, 
+                String.class
+            );
+            if (brandsResponse.getStatusCode() == HttpStatus.OK) {
+                context.append("\n\nThương hiệu: ").append(brandsResponse.getBody());
             }
 
         } catch (Exception e) {
-            logger.error("Exception khi gọi API Gemini", e);
-            return "Đã xảy ra lỗi: " + e.getMessage();
+            logger.warn("Lỗi khi thu thập dữ liệu context: {}", e.getMessage());
         }
+
+        // Gọi Mistral API với context đã thu thập
+        return mistralChatService.chat(message, context.toString());
     }
 }
