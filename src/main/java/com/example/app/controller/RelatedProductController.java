@@ -24,18 +24,14 @@ public class RelatedProductController {
         this.relatedProductService = relatedProductService;
     }
 
-    /**
-     * Lấy danh sách sản phẩm liên quan của một sản phẩm
-     */
+
     @GetMapping("/product/{productId}")
     public ResponseEntity<ResponseWrapper<List<RelatedProductDTO>>> getRelatedProducts(@PathVariable Integer productId) {
         List<RelatedProductDTO> relatedProducts = relatedProductService.getRelatedProducts(productId);
         return ResponseEntity.ok(ResponseWrapper.success("Related products retrieved successfully", relatedProducts));
     }
 
-    /**
-     * Lấy danh sách sản phẩm liên quan theo loại liên quan (upsell, cross_sell, accessory, similar)
-     */
+
     @GetMapping("/product/{productId}/type/{relationType}")
     public ResponseEntity<ResponseWrapper<List<RelatedProductDTO>>> getRelatedProductsByType(
             @PathVariable Integer productId,
@@ -46,9 +42,7 @@ public class RelatedProductController {
         return ResponseEntity.ok(ResponseWrapper.success("Related products retrieved successfully", relatedProducts));
     }
 
-    /**
-     * Thêm mối quan hệ sản phẩm (chỉ ADMIN)
-     */
+
     @PostMapping
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ResponseWrapper<RelatedProductDTO>> addRelatedProduct(
@@ -60,9 +54,7 @@ public class RelatedProductController {
                 HttpStatus.CREATED);
     }
 
-    /**
-     * Cập nhật loại mối quan hệ (chỉ ADMIN)
-     */
+
     @PatchMapping
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ResponseWrapper<RelatedProductDTO>> updateRelationType(
@@ -75,9 +67,6 @@ public class RelatedProductController {
         return ResponseEntity.ok(ResponseWrapper.success("Relation type updated successfully", updatedRelation));
     }
 
-    /**
-     * Xóa mối quan hệ sản phẩm (chỉ ADMIN)
-     */
     @DeleteMapping
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ResponseWrapper<?>> removeRelatedProduct(
@@ -90,9 +79,7 @@ public class RelatedProductController {
         return ResponseEntity.ok(ResponseWrapper.success("Related product removed successfully"));
     }
 
-    /**
-     * Xóa tất cả mối quan hệ của một sản phẩm (chỉ ADMIN)
-     */
+
     @DeleteMapping("/product/{productId}")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ResponseWrapper<?>> removeAllRelatedProducts(@PathVariable Integer productId) {
@@ -100,9 +87,7 @@ public class RelatedProductController {
         return ResponseEntity.ok(ResponseWrapper.success("All related products removed successfully"));
     }
 
-    /**
-     * Gợi ý sản phẩm liên quan dựa trên danh mục và thương hiệu
-     */
+
     @GetMapping("/suggestions/product/{productId}")
     public ResponseEntity<ResponseWrapper<List<RelatedProductDTO>>> getSuggestedRelatedProducts(
             @PathVariable Integer productId,

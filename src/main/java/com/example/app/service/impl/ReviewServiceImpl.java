@@ -46,7 +46,6 @@ public class ReviewServiceImpl implements ReviewService {
 
     @Override
     public PagedResponse<ReviewDTO> getReviewsByProduct(Integer productId, int page, int size) {
-        // Check if product exists
         if (!productRepository.existsById(productId)) {
             throw new ResourceNotFoundException("Product not found with id: " + productId);
         }
@@ -93,30 +92,24 @@ public class ReviewServiceImpl implements ReviewService {
     @Override
     @Transactional
     public ReviewDTO createReview(ReviewDTO reviewDTO) {
-        // Kiểm tra product
         Product product = productRepository.findById(reviewDTO.getProductId())
                 .orElseThrow(() -> new ResourceNotFoundException("Product not found with id: " + reviewDTO.getProductId()));
 
-        // Kiểm tra user
         User user = userRepository.findById(reviewDTO.getUserId())
                 .orElseThrow(() -> new ResourceNotFoundException("User not found with id: " + reviewDTO.getUserId()));
 
-        // Tạo đối tượng Review mới
         Review review = new Review();
         review.setProduct(product);
         review.setUser(user);
         review.setRating(reviewDTO.getRating());
         
-        // Sử dụng title và content mới
         review.setTitle(reviewDTO.getTitle());
         review.setContent(reviewDTO.getContent());
         
-        // Vẫn giữ lại trường comment cho khả năng tương thích ngược
         review.setComment(reviewDTO.getComment());
 
         Review savedReview = reviewRepository.save(review);
 
-        // Cập nhật lại điểm đánh giá trung bình của sản phẩm
         updateProductRating(product.getId());
 
         return convertToDTO(savedReview);
@@ -128,17 +121,14 @@ public class ReviewServiceImpl implements ReviewService {
         Review review = reviewRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Review not found with id: " + id));
 
-        // Verify user owns the review
         if (!review.getUser().getId().equals(reviewDTO.getUserId())) {
             throw new IllegalArgumentException("User does not own this review");
         }
 
-        // Check rating range
         if (reviewDTO.getRating() < 1 || reviewDTO.getRating() > 5) {
             throw new IllegalArgumentException("Rating must be between 1 and 5");
         }
 
-        // Update review
         review.setRating(reviewDTO.getRating());
         review.setComment(reviewDTO.getComment());
 
@@ -150,7 +140,6 @@ public class ReviewServiceImpl implements ReviewService {
     @Override
     @Transactional
     public void deleteReview(Integer id) {
-        // Check if review exists
         if (!reviewRepository.existsById(id)) {
             throw new ResourceNotFoundException("Review not found with id: " + id);
         }
@@ -160,7 +149,6 @@ public class ReviewServiceImpl implements ReviewService {
 
     @Override
     public Double calculateAverageRating(Integer productId) {
-        // Check if product exists
         if (!productRepository.existsById(productId)) {
             throw new ResourceNotFoundException("Product not found with id: " + productId);
         }
@@ -171,7 +159,6 @@ public class ReviewServiceImpl implements ReviewService {
 
     @Override
     public List<ReviewDTO> getRecentReviews(Integer productId, int limit) {
-        // Check if product exists
         if (!productRepository.existsById(productId)) {
             throw new ResourceNotFoundException("Product not found with id: " + productId);
         }
@@ -184,7 +171,6 @@ public class ReviewServiceImpl implements ReviewService {
                 .collect(Collectors.toList());
     }
 
-    // Utility method to convert Entity to DTO
     private ReviewDTO convertToDTO(Review review) {
         ReviewDTO dto = new ReviewDTO();
         dto.setId(review.getId());
@@ -203,36 +189,20 @@ public class ReviewServiceImpl implements ReviewService {
     }
     @Override
     public List<ReviewDTO> getReviewsByCurrentUser(String username) {
-        // Tìm user từ username
         User user = userRepository.findByUsername(username)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found with username: " + username));
 
-        // Lấy danh sách đánh giá của user
         return getReviewsByUser(user.getId());
     }
 
     @Override
     @Transactional
     public ReviewDTO createReviewByCurrentUser(String username, ReviewDTO reviewDTO) {
-        // Tìm user từ username
         User user = userRepository.findByUsername(username)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found with username: " + username));
 
-        // Kiểm tra quyền sở hữu
         reviewDTO.setUserId(user.getId());
 
-        // Kiểm tra xem người dùng đã mua sản phẩm chưa (tùy chọn)
-    /*
-    boolean hasPurchased = orderItemRepository.findByProductId(reviewDTO.getProductId()).stream()
-            .anyMatch(item -> item.getOrder().getUser() != null &&
-                           item.getOrder().getUser().getId().equals(user.getId()));
-
-    if (!hasPurchased) {
-        throw new IllegalArgumentException("You must purchase the product before reviewing");
-    }
-    */
-
-        // Kiểm tra xem người dùng đã đánh giá sản phẩm này chưa
         List<Review> existingReviews = reviewRepository.findByProductId(reviewDTO.getProductId(), PageRequest.of(0, 1000)).getContent();
         boolean hasReviewed = existingReviews.stream()
                 .anyMatch(review -> review.getUser().getId().equals(user.getId()));
@@ -247,38 +217,29 @@ public class ReviewServiceImpl implements ReviewService {
     @Override
     @Transactional
     public ReviewDTO updateReviewByCurrentUser(Integer id, String username, ReviewDTO reviewDTO) {
-        // Tìm user từ username
         User user = userRepository.findByUsername(username)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found with username: " + username));
 
-        // Tìm review
         Review review = reviewRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Review not found with id: " + id));
 
-        // Kiểm tra quyền sở hữu
         if (!review.getUser().getId().equals(user.getId())) {
             throw new IllegalArgumentException("You are not authorized to update this review");
         }
 
-        // Đảm bảo không thay đổi productId và userId
         reviewDTO.setProductId(review.getProduct().getId());
         reviewDTO.setUserId(user.getId());
 
         return updateReview(id, reviewDTO);
     }
 
-    /**
-     * Cập nhật điểm đánh giá trung bình cho sản phẩm
-     * @param productId ID của sản phẩm cần cập nhật
-     */
+
     private void updateProductRating(Integer productId) {
         Double avgRating = calculateAverageRating(productId);
         
         Product product = productRepository.findById(productId)
                 .orElseThrow(() -> new ResourceNotFoundException("Product not found with id: " + productId));
         
-        // Cập nhật lưu vào product nếu cần
-        // product.setAverageRating(avgRating);
-        // productRepository.save(product);
+
     }
 }

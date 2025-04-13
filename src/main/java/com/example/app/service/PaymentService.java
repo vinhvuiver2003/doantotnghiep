@@ -11,11 +11,11 @@ public interface PaymentService {
 
     PaymentDTO getPaymentByOrderId(Integer orderId);
 
-    String createVnPayPaymentUrl(Integer orderId, String bankCode, HttpServletRequest request);
+    String createMomoPaymentUrl(Integer orderId, HttpServletRequest request);
 
-    Map<String, String> processVnPayReturn(Map<String, String> queryParams, HttpServletRequest request);
+    Map<String, String> processMomoReturn(Map<String, String> queryParams, HttpServletRequest request);
 
-    boolean verifyVnPayIpn(Map<String, String> queryParams);
+    boolean verifyMomoIpn(Map<String, String> queryParams);
 
     PaymentDTO updatePaymentStatus(Integer id, Payment.PaymentStatus status);
 

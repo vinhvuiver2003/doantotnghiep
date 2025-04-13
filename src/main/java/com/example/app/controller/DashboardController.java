@@ -24,18 +24,14 @@ public class DashboardController {
         this.dashboardStatsService = dashboardStatsService;
     }
 
-    /**
-     * Lấy thống kê tổng quan (mặc định là tháng hiện tại)
-     */
+
     @GetMapping("/stats")
     public ResponseEntity<ResponseWrapper<DashboardStatsDTO>> getDashboardStats() {
         DashboardStatsDTO stats = dashboardStatsService.getDashboardStats();
         return ResponseEntity.ok(ResponseWrapper.success("Dashboard statistics retrieved successfully", stats));
     }
 
-    /**
-     * Lấy thống kê theo khoảng thời gian
-     */
+
     @GetMapping("/stats/date-range")
     public ResponseEntity<ResponseWrapper<DashboardStatsDTO>> getDashboardStatsByDateRange(
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime startDate,
@@ -45,25 +41,21 @@ public class DashboardController {
         return ResponseEntity.ok(ResponseWrapper.success("Dashboard statistics retrieved successfully", stats));
     }
 
-    /**
-     * Lấy thống kê bán hàng theo thời gian (ngày, tuần, tháng, năm)
-     */
+
     @GetMapping("/sales/{period}")
     public ResponseEntity<ResponseWrapper<Map<String, Object>>> getSalesByPeriod(
             @PathVariable String period,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime startDate,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime endDate) {
 
-        // Logic để lấy thống kê doanh số theo khoảng thời gian
-        // Các giá trị cho period: daily, weekly, monthly, yearly
 
         if (startDate == null) {
-            // Mặc định là đầu tháng hiện tại
+
             startDate = LocalDateTime.now().withDayOfMonth(1).withHour(0).withMinute(0).withSecond(0);
         }
 
         if (endDate == null) {
-            // Mặc định là thời điểm hiện tại
+
             endDate = LocalDateTime.now();
         }
 

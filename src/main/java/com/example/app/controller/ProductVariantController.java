@@ -23,36 +23,28 @@ public class ProductVariantController {
         this.variantService = variantService;
     }
 
-    /**
-     * Lấy danh sách biến thể theo sản phẩm
-     */
+
     @GetMapping("/product/{productId}")
     public ResponseEntity<ResponseWrapper<List<ProductVariantDTO>>> getVariantsByProduct(@PathVariable Integer productId) {
         List<ProductVariantDTO> variants = variantService.getVariantsByProduct(productId);
         return ResponseEntity.ok(ResponseWrapper.success("Variants retrieved successfully", variants));
     }
 
-    /**
-     * Lấy thông tin chi tiết một biến thể theo ID
-     */
+
     @GetMapping("/{id}")
     public ResponseEntity<ResponseWrapper<ProductVariantDTO>> getVariantById(@PathVariable Integer id) {
         ProductVariantDTO variant = variantService.getVariantById(id);
         return ResponseEntity.ok(ResponseWrapper.success("Variant retrieved successfully", variant));
     }
 
-    /**
-     * Lấy danh sách biến thể có sẵn theo sản phẩm (có tồn kho > 0)
-     */
+
     @GetMapping("/product/{productId}/available")
     public ResponseEntity<ResponseWrapper<List<ProductVariantDTO>>> getAvailableVariantsByProduct(@PathVariable Integer productId) {
         List<ProductVariantDTO> variants = variantService.getAvailableVariantsByProduct(productId);
         return ResponseEntity.ok(ResponseWrapper.success("Available variants retrieved successfully", variants));
     }
 
-    /**
-     * Tạo mới biến thể sản phẩm (chỉ ADMIN)
-     */
+
     @PostMapping
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ResponseWrapper<ProductVariantDTO>> createVariant(@Valid @RequestBody ProductVariantDTO variantDTO) {
@@ -62,9 +54,7 @@ public class ProductVariantController {
                 HttpStatus.CREATED);
     }
 
-    /**
-     * Cập nhật thông tin biến thể sản phẩm (chỉ ADMIN)
-     */
+
     @PutMapping("/{id}")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ResponseWrapper<ProductVariantDTO>> updateVariant(
@@ -75,9 +65,7 @@ public class ProductVariantController {
         return ResponseEntity.ok(ResponseWrapper.success("Variant updated successfully", updatedVariant));
     }
 
-    /**
-     * Cập nhật tồn kho biến thể sản phẩm (chỉ ADMIN)
-     */
+
     @PatchMapping("/{id}/stock")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ResponseWrapper<ProductVariantDTO>> updateVariantStock(
@@ -88,9 +76,7 @@ public class ProductVariantController {
         return ResponseEntity.ok(ResponseWrapper.success("Variant stock updated successfully", updatedVariant));
     }
 
-    /**
-     * Cập nhật trạng thái biến thể sản phẩm (chỉ ADMIN)
-     */
+
     @PatchMapping("/{id}/status")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ResponseWrapper<ProductVariantDTO>> updateVariantStatus(
@@ -101,9 +87,7 @@ public class ProductVariantController {
         return ResponseEntity.ok(ResponseWrapper.success("Variant status updated successfully", updatedVariant));
     }
 
-    /**
-     * Xóa biến thể sản phẩm (chỉ ADMIN)
-     */
+
     @DeleteMapping("/{id}")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ResponseWrapper<?>> deleteVariant(@PathVariable Integer id) {
@@ -111,9 +95,7 @@ public class ProductVariantController {
         return ResponseEntity.ok(ResponseWrapper.success("Variant deleted successfully"));
     }
 
-    /**
-     * Lấy danh sách biến thể có tồn kho thấp (chỉ ADMIN)
-     */
+   
     @GetMapping("/low-stock")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ResponseWrapper<List<ProductVariantDTO>>> getLowStockVariants(

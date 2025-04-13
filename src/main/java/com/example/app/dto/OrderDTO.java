@@ -1,5 +1,6 @@
 package com.example.app.dto;
 
+import com.example.app.entity.User;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -14,7 +15,8 @@ import java.util.List;
 public class OrderDTO {
     private Integer id;
     private Integer userId;
-    private String username; // Người dùng đã đăng nhập
+    private String username;
+    private User user;
     private String guestEmail;
     private String guestPhone;
     private String guestName;

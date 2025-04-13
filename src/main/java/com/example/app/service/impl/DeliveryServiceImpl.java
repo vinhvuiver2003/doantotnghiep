@@ -57,11 +57,9 @@ public class DeliveryServiceImpl implements DeliveryService {
     @Override
     @Transactional
     public DeliveryDTO createDelivery(DeliveryDTO deliveryDTO) {
-        // Kiểm tra đơn hàng tồn tại
         Order order = orderRepository.findById(deliveryDTO.getOrderId())
                 .orElseThrow(() -> new ResourceNotFoundException("Order not found with id: " + deliveryDTO.getOrderId()));
 
-        // Kiểm tra xem đã có thông tin giao hàng cho đơn hàng này chưa
         deliveryRepository.findByOrderId(deliveryDTO.getOrderId())
                 .ifPresent(delivery -> {
                     throw new IllegalArgumentException("Delivery already exists for order id: " + deliveryDTO.getOrderId());
@@ -75,12 +73,10 @@ public class DeliveryServiceImpl implements DeliveryService {
         delivery.setShippingAddress(deliveryDTO.getShippingAddress());
         delivery.setContactPhone(deliveryDTO.getContactPhone());
 
-        // Nếu trạng thái là "shipped", đặt shipped date
         if (delivery.getShippingStatus() == Delivery.ShippingStatus.shipped) {
             delivery.setShippedDate(LocalDateTime.now());
         }
 
-        // Nếu trạng thái là "delivered", đặt delivered date
         if (delivery.getShippingStatus() == Delivery.ShippingStatus.delivered) {
             delivery.setDeliveredDate(LocalDateTime.now());
         }
@@ -92,22 +88,18 @@ public class DeliveryServiceImpl implements DeliveryService {
     @Override
     @Transactional
     public DeliveryDTO updateDelivery(Integer id, DeliveryDTO deliveryDTO) {
-        // Kiểm tra thông tin giao hàng tồn tại
         Delivery delivery = deliveryRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Delivery not found with id: " + id));
 
-        // Cập nhật thông tin
         delivery.setShippingMethod(deliveryDTO.getShippingMethod());
         delivery.setTrackingNumber(deliveryDTO.getTrackingNumber());
         delivery.setShippingAddress(deliveryDTO.getShippingAddress());
         delivery.setContactPhone(deliveryDTO.getContactPhone());
 
-        // Cập nhật trạng thái nếu thay đổi
         if (!delivery.getShippingStatus().name().equals(deliveryDTO.getShippingStatus())) {
             Delivery.ShippingStatus newStatus = Delivery.ShippingStatus.valueOf(deliveryDTO.getShippingStatus());
             delivery.setShippingStatus(newStatus);
 
-            // Cập nhật các mốc thời gian liên quan đến trạng thái
             if (newStatus == Delivery.ShippingStatus.shipped && delivery.getShippedDate() == null) {
                 delivery.setShippedDate(LocalDateTime.now());
             }
@@ -124,14 +116,11 @@ public class DeliveryServiceImpl implements DeliveryService {
     @Override
     @Transactional
     public DeliveryDTO updateDeliveryStatus(Integer id, Delivery.ShippingStatus status) {
-        // Kiểm tra thông tin giao hàng tồn tại
         Delivery delivery = deliveryRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Delivery not found with id: " + id));
 
-        // Cập nhật trạng thái
         delivery.setShippingStatus(status);
 
-        // Cập nhật các mốc thời gian liên quan đến trạng thái
         if (status == Delivery.ShippingStatus.shipped && delivery.getShippedDate() == null) {
             delivery.setShippedDate(LocalDateTime.now());
         }
@@ -147,11 +136,9 @@ public class DeliveryServiceImpl implements DeliveryService {
     @Override
     @Transactional
     public DeliveryDTO updateTrackingNumber(Integer id, String trackingNumber) {
-        // Kiểm tra thông tin giao hàng tồn tại
         Delivery delivery = deliveryRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Delivery not found with id: " + id));
 
-        // Cập nhật mã vận đơn
         delivery.setTrackingNumber(trackingNumber);
 
         Delivery updatedDelivery = deliveryRepository.save(delivery);
@@ -175,7 +162,6 @@ public class DeliveryServiceImpl implements DeliveryService {
         return delivery.getOrder().getId();
     }
 
-    // Utility method to convert Entity to DTO
     private DeliveryDTO convertToDTO(Delivery delivery) {
         DeliveryDTO dto = new DeliveryDTO();
         dto.setId(delivery.getId());

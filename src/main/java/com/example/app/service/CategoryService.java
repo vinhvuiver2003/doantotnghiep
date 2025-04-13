@@ -2,6 +2,7 @@ package com.example.app.service;
 
 import com.example.app.dto.CategoryDTO;
 import com.example.app.dto.PagedResponse;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 
@@ -23,4 +24,7 @@ public interface CategoryService {
     void deleteCategory(Integer id);
 
     List<CategoryDTO> getActiveCategories();
+    
+
+    CategoryDTO uploadCategoryImage(Integer id, MultipartFile imageFile);
 }

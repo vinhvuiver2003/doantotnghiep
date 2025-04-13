@@ -110,7 +110,6 @@ public class UserServiceImpl implements UserService {
         user.setPhone(userCreateDTO.getPhone());
         user.setAddress(userCreateDTO.getAddress());
 
-        // Get user role (default to "USER" if not specified)
         String roleName = userCreateDTO.getRole() != null ? userCreateDTO.getRole() : "USER";
         Role role = roleRepository.findByName(roleName)
                 .orElseThrow(() -> new ResourceNotFoundException("Role not found: " + roleName));
@@ -126,7 +125,6 @@ public class UserServiceImpl implements UserService {
         User user = userRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found with id: " + id));
 
-        // Update fields that are allowed to be changed
         if (userDTO.getFirstName() != null) {
             user.setFirstName(userDTO.getFirstName());
         }
@@ -135,13 +133,10 @@ public class UserServiceImpl implements UserService {
             user.setLastName(userDTO.getLastName());
         }
         
-        // Phone có thể null hoặc chuỗi rỗng
         user.setPhone(userDTO.getPhone());
         
-        // Address có thể null hoặc chuỗi rỗng
         user.setAddress(userDTO.getAddress());
 
-        // Email update requires checking for existing email
         if (userDTO.getEmail() != null && !userDTO.getEmail().equals(user.getEmail())) {
             if (userRepository.existsByEmail(userDTO.getEmail())) {
                 throw new IllegalArgumentException("Email already exists");
@@ -149,7 +144,6 @@ public class UserServiceImpl implements UserService {
             user.setEmail(userDTO.getEmail());
         }
 
-        // Update role if provided
         if (userDTO.getRole() != null && !user.getRole().getName().equals(userDTO.getRole())) {
             Role role = roleRepository.findByName(userDTO.getRole())
                     .orElseThrow(() -> new ResourceNotFoundException("Role not found: " + userDTO.getRole()));
@@ -163,19 +157,15 @@ public class UserServiceImpl implements UserService {
     @Override
     @Transactional
     public void deleteUser(Integer id) {
-        // Check if user exists
         User user = userRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found with id: " + id));
 
-        // Kiểm tra xem người dùng có vai trò ADMIN không
         if (user.getRole().getName().equals("ROLE_ADMIN")) {
             throw new IllegalArgumentException("Không thể xóa tài khoản Admin");
         }
 
-        // Xóa các token xác thực trước
         tokenRepository.deleteByUser(user);
 
-        // Xóa người dùng
         userRepository.deleteById(id);
     }
 
@@ -187,7 +177,6 @@ public class UserServiceImpl implements UserService {
         SecurityContextHolder.getContext().setAuthentication(authentication);
         String jwt = jwtUtils.generateJwtToken(authentication);
 
-        // Update last login timestamp
         User user = userRepository.findByUsername(loginRequest.getUsernameOrEmail())
                 .orElseGet(() -> userRepository.findByEmail(loginRequest.getUsernameOrEmail())
                         .orElseThrow(() -> new ResourceNotFoundException("User not found")));
@@ -204,17 +193,14 @@ public class UserServiceImpl implements UserService {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found with id: " + userId));
 
-        // Verify current password
         if (!passwordEncoder.matches(changePasswordRequest.getCurrentPassword(), user.getPasswordHash())) {
             throw new IllegalArgumentException("Current password is incorrect");
         }
 
-        // Verify new password and confirm password match
         if (!changePasswordRequest.getNewPassword().equals(changePasswordRequest.getConfirmPassword())) {
             throw new IllegalArgumentException("New password and confirm password do not match");
         }
 
-        // Update password
         user.setPasswordHash(passwordEncoder.encode(changePasswordRequest.getNewPassword()));
         userRepository.save(user);
 
@@ -235,7 +221,6 @@ public class UserServiceImpl implements UserService {
         return userRepository.count();
     }
 
-    // Utility method to convert Entity to DTO
     private UserDTO convertToDTO(User user) {
         UserDTO dto = new UserDTO();
         dto.setId(user.getId());

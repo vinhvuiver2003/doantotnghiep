@@ -72,13 +72,10 @@ public class AuthServiceImpl implements AuthService {
                 )
         );
 
-        // Lưu Authentication vào SecurityContext
         SecurityContextHolder.getContext().setAuthentication(authentication);
 
-        // Tạo JWT token
         String jwt = jwtUtils.generateJwtToken(authentication);
 
-        // Cập nhật thời gian đăng nhập cuối
         User user;
         if (loginRequest.getUsernameOrEmail().contains("@")) {
             user = userRepository.findByEmail(loginRequest.getUsernameOrEmail())
@@ -90,7 +87,6 @@ public class AuthServiceImpl implements AuthService {
 
         updateLastLogin(user.getId());
 
-        // Trả về Response kèm token và thông tin user
         UserDTO userDTO = userService.getUserById(user.getId());
         return new LoginResponse(jwt, "Bearer", userDTO);
     }
@@ -98,32 +94,26 @@ public class AuthServiceImpl implements AuthService {
     @Override
     @Transactional
     public UserDTO register(UserCreateDTO registerRequest) {
-        // Kiểm tra username đã tồn tại
         if (userRepository.existsByUsername(registerRequest.getUsername())) {
             throw new IllegalArgumentException("Username already exists: " + registerRequest.getUsername());
         }
 
-        // Kiểm tra emails đã tồn tại
         if (userRepository.existsByEmail(registerRequest.getEmail())) {
             throw new IllegalArgumentException("Email already exists: " + registerRequest.getEmail());
         }
 
-        // Đăng ký người dùng mới (mặc định role USER)
         if (registerRequest.getRole() == null) {
             registerRequest.setRole("USER");
         }
 
         UserDTO newUser = userService.registerUser(registerRequest);
 
-        // Lấy entity User từ repository
         User user = userRepository.findById(newUser.getId())
                 .orElseThrow(() -> new ResourceNotFoundException("User not found after registration"));
 
-        // Tạo token xác thực
         String verificationToken = verificationTokenService.createVerificationToken(user, verificationExpiryHours).getToken();
         String verificationLink = emailUtils.generateVerificationLink(verificationToken);
 
-        // Gửi emails xác thực
         emailService.sendVerificationEmail(
                 registerRequest.getEmail(),
                 registerRequest.getFirstName() + " " + registerRequest.getLastName(),

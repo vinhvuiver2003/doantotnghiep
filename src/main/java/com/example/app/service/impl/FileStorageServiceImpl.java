@@ -27,11 +27,9 @@ public class FileStorageServiceImpl implements FileStorageService {
 
     @Override
     public String storeFile(MultipartFile file, String directory, String customFileName) throws IOException {
-        // Tạo thư mục nếu không tồn tại
         Path directoryPath = Paths.get(uploadDir, directory);
         Files.createDirectories(directoryPath);
 
-        // Tạo tên file duy nhất nếu không có tên custom
         String fileName = customFileName;
         if (fileName == null || fileName.isEmpty()) {
             String originalFileName = file.getOriginalFilename();
@@ -42,7 +40,6 @@ public class FileStorageServiceImpl implements FileStorageService {
             fileName = UUID.randomUUID().toString() + fileExtension;
         }
 
-        // Lưu file
         Path filePath = directoryPath.resolve(fileName);
         Files.copy(file.getInputStream(), filePath, StandardCopyOption.REPLACE_EXISTING);
 

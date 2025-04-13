@@ -24,9 +24,7 @@ public class DeliveryController {
         this.deliveryService = deliveryService;
     }
 
-    /**
-     * Lấy thông tin giao hàng theo ID
-     */
+
     @GetMapping("/{id}")
     @PreAuthorize("hasRole('ADMIN') or @orderSecurity.isOwner(#deliveryService.getOrderIdByDeliveryId(#id))")
     public ResponseEntity<ResponseWrapper<DeliveryDTO>> getDeliveryById(@PathVariable Integer id) {
@@ -34,9 +32,7 @@ public class DeliveryController {
         return ResponseEntity.ok(ResponseWrapper.success("Delivery retrieved successfully", delivery));
     }
 
-    /**
-     * Lấy thông tin giao hàng theo đơn hàng
-     */
+
     @GetMapping("/order/{orderId}")
     @PreAuthorize("hasRole('ADMIN') or @orderSecurity.isOwner(#orderId)")
     public ResponseEntity<ResponseWrapper<DeliveryDTO>> getDeliveryByOrderId(@PathVariable Integer orderId) {
@@ -44,9 +40,7 @@ public class DeliveryController {
         return ResponseEntity.ok(ResponseWrapper.success("Delivery retrieved successfully", delivery));
     }
 
-    /**
-     * Lấy danh sách giao hàng theo trạng thái (chỉ ADMIN)
-     */
+
     @GetMapping("/status/{status}")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ResponseWrapper<List<DeliveryDTO>>> getDeliveriesByStatus(@PathVariable String status) {
@@ -55,9 +49,7 @@ public class DeliveryController {
         return ResponseEntity.ok(ResponseWrapper.success("Deliveries retrieved successfully", deliveries));
     }
 
-    /**
-     * Tạo thông tin giao hàng mới (chỉ ADMIN)
-     */
+
     @PostMapping
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ResponseWrapper<DeliveryDTO>> createDelivery(@Valid @RequestBody DeliveryDTO deliveryDTO) {
@@ -67,9 +59,7 @@ public class DeliveryController {
                 HttpStatus.CREATED);
     }
 
-    /**
-     * Cập nhật thông tin giao hàng (chỉ ADMIN)
-     */
+
     @PutMapping("/{id}")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ResponseWrapper<DeliveryDTO>> updateDelivery(
@@ -80,9 +70,7 @@ public class DeliveryController {
         return ResponseEntity.ok(ResponseWrapper.success("Delivery updated successfully", updatedDelivery));
     }
 
-    /**
-     * Cập nhật trạng thái giao hàng (chỉ ADMIN)
-     */
+
     @PatchMapping("/{id}/status")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ResponseWrapper<DeliveryDTO>> updateDeliveryStatus(
@@ -94,9 +82,7 @@ public class DeliveryController {
         return ResponseEntity.ok(ResponseWrapper.success("Delivery status updated successfully", updatedDelivery));
     }
 
-    /**
-     * Cập nhật mã vận đơn (tracking number) (chỉ ADMIN)
-     */
+
     @PatchMapping("/{id}/tracking")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ResponseWrapper<DeliveryDTO>> updateTrackingNumber(
@@ -107,9 +93,7 @@ public class DeliveryController {
         return ResponseEntity.ok(ResponseWrapper.success("Tracking number updated successfully", updatedDelivery));
     }
 
-    /**
-     * Tìm kiếm theo mã vận đơn (tracking number)
-     */
+
     @GetMapping("/tracking/{trackingNumber}")
     public ResponseEntity<ResponseWrapper<List<DeliveryDTO>>> findByTrackingNumber(@PathVariable String trackingNumber) {
         List<DeliveryDTO> deliveries = deliveryService.findByTrackingNumber(trackingNumber);

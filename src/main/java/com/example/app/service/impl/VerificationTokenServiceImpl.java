@@ -28,12 +28,10 @@ public class VerificationTokenServiceImpl implements VerificationTokenService {
     @Override
     @Transactional
     public VerificationToken createVerificationToken(User user, int expiryHours) {
-        // Vô hiệu hóa các token cũ
         List<VerificationToken> existingTokens = tokenRepository.findByUser(user);
         existingTokens.forEach(token -> token.setUsed(true));
         tokenRepository.saveAll(existingTokens);
 
-        // Tạo token mới
         VerificationToken token = new VerificationToken(user, expiryHours);
         return tokenRepository.save(token);
     }

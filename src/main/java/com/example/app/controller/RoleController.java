@@ -24,36 +24,27 @@ public class RoleController {
         this.roleService = roleService;
     }
 
-    /**
-     * Lấy danh sách tất cả vai trò
-     */
+
     @GetMapping
     public ResponseEntity<ResponseWrapper<List<RoleDTO>>> getAllRoles() {
         List<RoleDTO> roles = roleService.getAllRoles();
         return ResponseEntity.ok(ResponseWrapper.success("Roles retrieved successfully", roles));
     }
 
-    /**
-     * Lấy thông tin một vai trò theo ID
-     */
+
     @GetMapping("/{id}")
     public ResponseEntity<ResponseWrapper<RoleDTO>> getRoleById(@PathVariable Integer id) {
         RoleDTO role = roleService.getRoleById(id);
         return ResponseEntity.ok(ResponseWrapper.success("Role retrieved successfully", role));
     }
 
-    /**
-     * Lấy thông tin một vai trò theo tên
-     */
+
     @GetMapping("/name/{name}")
     public ResponseEntity<ResponseWrapper<RoleDTO>> getRoleByName(@PathVariable String name) {
         RoleDTO role = roleService.getRoleByName(name);
         return ResponseEntity.ok(ResponseWrapper.success("Role retrieved successfully", role));
     }
 
-    /**
-     * Tạo mới một vai trò
-     */
     @PostMapping
     public ResponseEntity<ResponseWrapper<RoleDTO>> createRole(@Valid @RequestBody RoleDTO roleDTO) {
         RoleDTO createdRole = roleService.createRole(roleDTO);
@@ -62,9 +53,7 @@ public class RoleController {
                 HttpStatus.CREATED);
     }
 
-    /**
-     * Cập nhật thông tin một vai trò
-     */
+
     @PutMapping("/{id}")
     public ResponseEntity<ResponseWrapper<RoleDTO>> updateRole(
             @PathVariable Integer id,
@@ -74,18 +63,14 @@ public class RoleController {
         return ResponseEntity.ok(ResponseWrapper.success("Role updated successfully", updatedRole));
     }
 
-    /**
-     * Xóa một vai trò
-     */
+
     @DeleteMapping("/{id}")
     public ResponseEntity<ResponseWrapper<?>> deleteRole(@PathVariable Integer id) {
         roleService.deleteRole(id);
         return ResponseEntity.ok(ResponseWrapper.success("Role deleted successfully"));
     }
 
-    /**
-     * Kiểm tra xem một vai trò có tồn tại theo tên
-     */
+
     @GetMapping("/exists/{name}")
     public ResponseEntity<ResponseWrapper<Boolean>> checkRoleExists(@PathVariable String name) {
         boolean exists = roleService.existsByName(name);

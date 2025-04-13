@@ -24,7 +24,6 @@ public class PasswordResetController {
             passwordResetService.createPasswordResetTokenForUser(email);
             return ResponseEntity.ok(ResponseWrapper.success("Nếu emails này đã được đăng ký, chúng tôi đã gửi cho bạn hướng dẫn đặt lại mật khẩu"));
         } catch (Exception e) {
-            // Trả về thông báo thành công dù có lỗi, để tránh rò rỉ thông tin tài khoản
             return ResponseEntity.ok(ResponseWrapper.success("Nếu emails này đã được đăng ký, chúng tôi đã gửi cho bạn hướng dẫn đặt lại mật khẩu"));
         }
     }

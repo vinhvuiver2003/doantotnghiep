@@ -23,6 +23,7 @@ import com.example.app.service.EmailService;
 import com.example.app.service.OrderService;
 import org.modelmapper.ModelMapper;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -44,11 +45,13 @@ import java.util.stream.Collectors;
 
 @Service
 public class OrderServiceImpl implements OrderService {
-
+    @Value("${frontend.url}")
+    String FRONTEND_URL;
     private final OrderRepository orderRepository;
     private final OrderItemRepository orderItemRepository;
     private final UserRepository userRepository;
     private final ProductRepository productRepository;
+
     private final ProductVariantRepository variantRepository;
     private final CartRepository cartRepository;
     private final CartItemRepository cartItemRepository;
@@ -117,7 +120,6 @@ public class OrderServiceImpl implements OrderService {
 
     @Override
     public PagedResponse<OrderDTO> getOrdersByUser(Integer userId, int page, int size) {
-        // Check if user exists
         if (!userRepository.existsById(userId)) {
             throw new ResourceNotFoundException("User not found with id: " + userId);
         }
@@ -146,22 +148,17 @@ public class OrderServiceImpl implements OrderService {
         User user = userRepository.findById(orderDTO.getUserId())
                 .orElseThrow(() -> new ResourceNotFoundException("User not found with id: " + orderDTO.getUserId()));
 
-        // Ánh xạ DTO sang entity
         Order order = modelMapper.map(orderDTO, Order.class);
         order.setUser(user);
-        // Thời gian tạo đơn hàng sẽ được tự động thiết lập trong @PrePersist
 
-        // Đảm bảo các OrderItem trỏ đến Order này
         if (order.getItems() != null) {
             for (OrderItem item : order.getItems()) {
                 item.setOrder(order);
             }
         }
 
-        // Lưu đơn hàng
         Order savedOrder = orderRepository.save(order);
 
-        // Gửi emails xác nhận đơn hàng
         sendOrderConfirmationEmail(savedOrder);
 
         return modelMapper.map(savedOrder, OrderDTO.class);
@@ -174,31 +171,21 @@ public class OrderServiceImpl implements OrderService {
         Cart cart = cartRepository.findByIdWithFullDetails(checkoutRequest.getCartId())
                 .orElseThrow(() -> new ResourceNotFoundException("Cart not found with id: " + checkoutRequest.getCartId()));
 
-        // Kiểm tra xem giỏ hàng đã được thanh toán chưa
         if (cart.getIsCheckedOut()) {
             throw new IllegalStateException("Giỏ hàng này đã được thanh toán. Vui lòng tạo giỏ hàng mới.");
         }
 
-        // Get user if user ID is provided
-        User user = null;
-        if (checkoutRequest.getUserId() != null) {
-            user = userRepository.findById(checkoutRequest.getUserId())
-                    .orElseThrow(() -> new ResourceNotFoundException("User not found with id: " + checkoutRequest.getUserId()));
+        if (checkoutRequest.getUserId() == null) {
+            throw new IllegalArgumentException("Bạn cần đăng nhập để thực hiện thanh toán");
         }
 
-        // Create new order
+        // Get user (bắt buộc)
+        User user = userRepository.findById(checkoutRequest.getUserId())
+                .orElseThrow(() -> new ResourceNotFoundException("User not found with id: " + checkoutRequest.getUserId()));
+
         Order order = new Order();
 
-        // Set user if provided
-        if (checkoutRequest.getUserId() != null) {
-            order.setUser(user);
-        } else {
-            // Set guest info
-            order.setGuestEmail(checkoutRequest.getEmail());
-            order.setGuestPhone(checkoutRequest.getPhone());
-            order.setGuestName(checkoutRequest.getName());
-        }
-
+        order.setUser(user);
         order.setOrderStatus(Order.OrderStatus.pending);
         order.setNote(checkoutRequest.getNote());
 
@@ -206,12 +193,10 @@ public class OrderServiceImpl implements OrderService {
         BigDecimal totalAmount = BigDecimal.ZERO;
         BigDecimal discountAmount = BigDecimal.ZERO;
 
-        // Apply promotion if provided
         if (checkoutRequest.getPromotionCode() != null && !checkoutRequest.getPromotionCode().isEmpty()) {
             Promotion promotion = promotionRepository.findByCode(checkoutRequest.getPromotionCode())
                     .orElseThrow(() -> new ResourceNotFoundException("Promotion not found with code: " + checkoutRequest.getPromotionCode()));
 
-            // Verify promotion is active
             LocalDateTime now = LocalDateTime.now();
             if (!promotion.getStatus().equals(Promotion.PromotionStatus.active) ||
                     now.isBefore(promotion.getStartDate()) ||
@@ -219,14 +204,10 @@ public class OrderServiceImpl implements OrderService {
                 throw new IllegalArgumentException("Promotion is not active");
             }
 
-            // Verify usage limit not exceeded
             if (promotion.getUsageLimit() != null && promotion.getUsageCount() >= promotion.getUsageLimit()) {
                 throw new IllegalArgumentException("Promotion usage limit exceeded");
             }
 
-            // Calculate discount
-            // Logic for calculating discount will depend on the discount type and business rules
-            // This is a simplified example
             for (CartItem cartItem : cart.getItems()) {
                 BigDecimal itemTotal = cartItem.getProduct().getBasePrice()
                         .add(cartItem.getVariant().getPriceAdjustment())
@@ -234,12 +215,10 @@ public class OrderServiceImpl implements OrderService {
                 totalAmount = totalAmount.add(itemTotal);
             }
 
-            // Verify minimum order requirement
             if (totalAmount.compareTo(promotion.getMinimumOrder()) < 0) {
                 throw new IllegalArgumentException("Order does not meet minimum amount for this promotion");
             }
 
-            // Calculate discount based on type
             if (promotion.getDiscountType().equals(Promotion.DiscountType.percentage)) {
                 discountAmount = totalAmount.multiply(promotion.getDiscountValue().divide(BigDecimal.valueOf(100)));
             } else {
@@ -250,11 +229,9 @@ public class OrderServiceImpl implements OrderService {
                 }
             }
 
-            // Update promotion usage count
             promotion.setUsageCount(promotion.getUsageCount() + 1);
             promotionRepository.save(promotion);
         } else {
-            // Calculate total without promotion
             for (CartItem cartItem : cart.getItems()) {
                 BigDecimal itemTotal = cartItem.getProduct().getBasePrice()
                         .add(cartItem.getVariant().getPriceAdjustment())
@@ -263,10 +240,14 @@ public class OrderServiceImpl implements OrderService {
             }
         }
 
-        // Set shipping fee (this could be calculated based on various factors)
-        BigDecimal shippingFee = BigDecimal.valueOf(10.00); // Example fixed shipping fee
+        BigDecimal shippingFee;
+        if (checkoutRequest.getShippingMethod().equals("express")) {
+            shippingFee = BigDecimal.valueOf(50000);
+        } else {
+            // Standard shipping
+            shippingFee = BigDecimal.valueOf(20000);
+        }
 
-        // Calculate final amount
         BigDecimal finalAmount = totalAmount.subtract(discountAmount).add(shippingFee);
 
         order.setTotalAmount(totalAmount);
@@ -276,7 +257,6 @@ public class OrderServiceImpl implements OrderService {
 
         Order savedOrder = orderRepository.save(order);
 
-        // Create order items from cart items
         for (CartItem cartItem : cart.getItems()) {
             OrderItem orderItem = new OrderItem();
             orderItem.setOrder(savedOrder);
@@ -284,7 +264,6 @@ public class OrderServiceImpl implements OrderService {
             orderItem.setVariant(cartItem.getVariant());
             orderItem.setQuantity(cartItem.getQuantity());
 
-            // Calculate prices
             BigDecimal unitPrice = cartItem.getProduct().getBasePrice().add(cartItem.getVariant().getPriceAdjustment());
             orderItem.setUnitPrice(unitPrice);
             orderItem.setDiscount(BigDecimal.ZERO); // Individual item discounts not implemented in this simplified example
@@ -292,7 +271,6 @@ public class OrderServiceImpl implements OrderService {
 
             orderItemRepository.save(orderItem);
 
-            // Update variant stock
             ProductVariant variant = cartItem.getVariant();
             int remainingVariantStock = variant.getStockQuantity() - cartItem.getQuantity();
             variant.setStockQuantity(Math.max(0, remainingVariantStock));
@@ -302,7 +280,6 @@ public class OrderServiceImpl implements OrderService {
             variantRepository.save(variant);
         }
 
-        // Create delivery record
         Delivery delivery = new Delivery();
         delivery.setOrder(savedOrder);
         delivery.setShippingStatus(Delivery.ShippingStatus.pending);
@@ -312,13 +289,11 @@ public class OrderServiceImpl implements OrderService {
 
         deliveryRepository.save(delivery);
 
-        // Create payment record
         Payment payment = new Payment();
         payment.setOrder(savedOrder);
         payment.setStatus(Payment.PaymentStatus.pending);
         payment.setAmount(finalAmount);
 
-        // Handle payment method specific fields
         if (checkoutRequest.getPaymentMethod().equals("bank_transfer")) {
             payment.setBankAccount(checkoutRequest.getBankAccount());
             payment.setBankTransferCode(checkoutRequest.getBankTransferCode());
@@ -326,7 +301,6 @@ public class OrderServiceImpl implements OrderService {
 
         paymentRepository.save(payment);
 
-        // Đánh dấu giỏ hàng đã được thanh toán
         cart.setIsCheckedOut(true);
         cartRepository.save(cart);
 
@@ -345,7 +319,6 @@ public class OrderServiceImpl implements OrderService {
         order.setOrderStatus(status);
         Order updatedOrder = orderRepository.save(order);
 
-        // Update delivery status based on order status
         Optional<Delivery> deliveryOpt = deliveryRepository.findByOrderId(id);
         if (deliveryOpt.isPresent()) {
             Delivery delivery = deliveryOpt.get();
@@ -361,7 +334,6 @@ public class OrderServiceImpl implements OrderService {
             }
         }
 
-        // Update payment status if order is completed or cancelled
         Optional<Payment> paymentOpt = paymentRepository.findByOrderId(id);
         if (paymentOpt.isPresent()) {
             Payment payment = paymentOpt.get();
@@ -374,10 +346,8 @@ public class OrderServiceImpl implements OrderService {
                 payment.setStatus(Payment.PaymentStatus.failed);
                 paymentRepository.save(payment);
 
-                // If order is cancelled, restore stock
                 List<OrderItem> orderItems = orderItemRepository.findByOrderId(id);
                 for (OrderItem item : orderItems) {
-                    // Restore variant stock
                     ProductVariant variant = item.getVariant();
                     variant.setStockQuantity(variant.getStockQuantity() + item.getQuantity());
                     if (variant.getStatus() == ProductVariant.VariantStatus.out_of_stock && variant.getStockQuantity() > 0) {
@@ -388,7 +358,6 @@ public class OrderServiceImpl implements OrderService {
             }
         }
 
-        // Gửi emails cập nhật trạng thái đơn hàng
         sendOrderStatusUpdateEmail(updatedOrder, order.getOrderStatus().name());
 
         return convertToDTO(updatedOrder);
@@ -397,12 +366,10 @@ public class OrderServiceImpl implements OrderService {
     @Override
     @Transactional
     public void deleteOrder(Integer id) {
-        // Check if order exists
         if (!orderRepository.existsById(id)) {
             throw new ResourceNotFoundException("Order not found with id: " + id);
         }
 
-        // Delete order (cascading deletion should handle order items, delivery, and payment)
         orderRepository.deleteById(id);
     }
 
@@ -443,7 +410,6 @@ public class OrderServiceImpl implements OrderService {
         return (long) orderRepository.findByOrderStatus(Order.OrderStatus.pending).size();
     }
 
-    // Utility method to convert Entity to DTO
     private OrderDTO convertToDTO(Order order) {
         OrderDTO dto = new OrderDTO();
         dto.setId(order.getId());
@@ -451,6 +417,7 @@ public class OrderServiceImpl implements OrderService {
         if (order.getUser() != null) {
             dto.setUserId(order.getUser().getId());
             dto.setUsername(order.getUser().getUsername());
+            dto.setUser(order.getUser());
         } else {
             dto.setGuestEmail(order.getGuestEmail());
             dto.setGuestPhone(order.getGuestPhone());
@@ -466,7 +433,6 @@ public class OrderServiceImpl implements OrderService {
         dto.setCreatedAt(order.getCreatedAt());
         dto.setUpdatedAt(order.getUpdatedAt());
 
-        // Get order items
         List<OrderItemDTO> itemDTOs = new ArrayList<>();
         if (order.getItems() != null && !order.getItems().isEmpty()) {
             for (OrderItem item : order.getItems()) {
@@ -474,7 +440,6 @@ public class OrderServiceImpl implements OrderService {
                 itemDTO.setId(item.getId());
                 itemDTO.setOrderId(order.getId());
                 
-                // Chỉ lấy thông tin cần thiết từ product để tránh vòng lặp sâu
                 if (item.getProduct() != null) {
                     itemDTO.setProductId(item.getProduct().getId());
                     itemDTO.setProductName(item.getProduct().getName());
@@ -498,7 +463,6 @@ public class OrderServiceImpl implements OrderService {
         }
         dto.setItems(itemDTOs);
 
-        // Get delivery information if exists
         if (order.getDelivery() != null) {
             DeliveryDTO deliveryDTO = new DeliveryDTO();
             Delivery delivery = order.getDelivery();
@@ -516,7 +480,6 @@ public class OrderServiceImpl implements OrderService {
 
             dto.setDelivery(deliveryDTO);
         } else {
-            // Nếu không có trong entity, tìm kiếm từ repository
             Optional<Delivery> deliveryOpt = deliveryRepository.findByOrderId(order.getId());
             if (deliveryOpt.isPresent()) {
                 Delivery delivery = deliveryOpt.get();
@@ -537,7 +500,6 @@ public class OrderServiceImpl implements OrderService {
             }
         }
 
-        // Get payment information if exists
         if (order.getPayment() != null) {
             PaymentDTO paymentDTO = new PaymentDTO();
             Payment payment = order.getPayment();
@@ -552,7 +514,6 @@ public class OrderServiceImpl implements OrderService {
 
             dto.setPayment(paymentDTO);
         } else {
-            // Nếu không có trong entity, tìm kiếm từ repository
             Optional<Payment> paymentOpt = paymentRepository.findByOrderId(order.getId());
             if (paymentOpt.isPresent()) {
                 Payment payment = paymentOpt.get();
@@ -572,37 +533,28 @@ public class OrderServiceImpl implements OrderService {
 
         return dto;
     }
-    /**
-     * Lấy danh sách đơn hàng của người dùng hiện tại dựa vào username
 
-     */
 
     @Override
     public PagedResponse<OrderDTO> getOrdersByCurrentUser(String username, int page, int size) {
-        // Tìm user từ username
         User user = userRepository.findByUsername(username)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found with username: " + username));
 
-        // Lấy danh sách đơn hàng của user
         return getOrdersByUser(user.getId(), page, size);
     }
 
 
 
-    // Cài đặt trong OrderServiceImpl
     @Override
     public Map<String, Object> getSalesStatistics(LocalDateTime startDate, LocalDateTime endDate) {
         Map<String, Object> stats = new HashMap<>();
 
-        // Tính tổng doanh số
         BigDecimal totalSales = calculateTotalSales(startDate, endDate);
         stats.put("totalSales", totalSales);
 
-        // Đếm tổng số đơn hàng
         List<Order> orders = orderRepository.findOrdersByDateRange(startDate, endDate);
         stats.put("totalOrders", orders.size());
 
-        // Tính doanh số theo trạng thái đơn hàng
         Map<String, BigDecimal> salesByStatus = new HashMap<>();
         for (Order.OrderStatus status : Order.OrderStatus.values()) {
             BigDecimal statusTotal = orders.stream()
@@ -613,7 +565,6 @@ public class OrderServiceImpl implements OrderService {
         }
         stats.put("salesByStatus", salesByStatus);
 
-        // Tính doanh số theo ngày
         Map<String, BigDecimal> salesByDate = new HashMap<>();
         orders.forEach(order -> {
             String date = order.getCreatedAt().toLocalDate().toString();
@@ -621,7 +572,6 @@ public class OrderServiceImpl implements OrderService {
         });
         stats.put("salesByDate", salesByDate);
 
-        // Tính giá trị đơn hàng trung bình
         BigDecimal averageOrderValue = totalSales.divide(
                 BigDecimal.valueOf(Math.max(1, orders.size())),
                 2, RoundingMode.HALF_UP);
@@ -630,17 +580,13 @@ public class OrderServiceImpl implements OrderService {
         return stats;
     }
 
-    // Phương thức gửi emails xác nhận đơn hàng
     private void sendOrderConfirmationEmail(Order order) {
-        // Chuẩn bị dữ liệu cho template
         Map<String, Object> orderDetails = new HashMap<>();
 
-        // Thông tin chung của đơn hàng
         orderDetails.put("orderId", order.getId());
         orderDetails.put("orderDate", order.getCreatedAt().format(DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm")));
         orderDetails.put("customerName", order.getUser().getFirstName() + " " + order.getUser().getLastName());
 
-        // Trường hợp này giả định có payment method và địa chỉ giao hàng, thay đổi tùy theo cấu trúc thực tế
         String paymentMethod = "Thanh toán khi nhận hàng";
         if (order.getPayment() != null) {
             paymentMethod = order.getPayment().getStatus().name();
@@ -653,7 +599,6 @@ public class OrderServiceImpl implements OrderService {
         }
         orderDetails.put("shippingAddress", shippingAddress);
 
-        // Danh sách sản phẩm
         List<Map<String, Object>> items = order.getItems().stream().map(item -> {
             Map<String, Object> itemMap = new HashMap<>();
             itemMap.put("name", item.getProduct().getName());
@@ -665,39 +610,31 @@ public class OrderServiceImpl implements OrderService {
 
         orderDetails.put("items", items);
 
-        // Tổng tiền
         orderDetails.put("subtotal", formatCurrency(order.getTotalAmount().doubleValue()));
         orderDetails.put("shippingFee", formatCurrency(order.getShippingFee().doubleValue()));
         orderDetails.put("discount", formatCurrency(order.getDiscountAmount().doubleValue()));
         orderDetails.put("total", formatCurrency(order.getFinalAmount().doubleValue()));
 
-        // Link xem chi tiết đơn hàng (có thể thay đổi theo cấu hình thực tế)
-        orderDetails.put("orderLink", "http://localhost:3000/account/orders/" + order.getId());
+        orderDetails.put("orderLink", FRONTEND_URL+"/account/orders/" + order.getId());
 
         // Gửi emails
         emailService.sendOrderConfirmationEmail(order.getUser().getEmail(), orderDetails);
     }
 
-    // Phương thức gửi emails cập nhật trạng thái đơn hàng
-    private void sendOrderStatusUpdateEmail(Order order, String oldStatus) {
-        // Chỉ gửi emails khi có sự thay đổi trạng thái
+     private void sendOrderStatusUpdateEmail(Order order, String oldStatus) {
         if (oldStatus.equals(order.getOrderStatus().name())) {
             return;
         }
 
-        // Chuẩn bị dữ liệu cho template
         Map<String, Object> statusDetails = new HashMap<>();
 
-        // Thông tin đơn hàng
         statusDetails.put("orderId", order.getId());
         statusDetails.put("orderDate", order.getCreatedAt().format(DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm")));
         statusDetails.put("customerName", order.getUser().getFirstName() + " " + order.getUser().getLastName());
 
-        // Thông tin trạng thái
         statusDetails.put("statusMessage", getStatusMessage(order.getOrderStatus().name()));
         statusDetails.put("statusClass", getStatusClass(order.getOrderStatus().name()));
 
-        // Thông tin theo dõi đơn hàng (nếu có)
         if ("SHIPPED".equals(order.getOrderStatus().name()) && order.getDelivery() != null) {
             Map<String, String> trackingInfo = new HashMap<>();
             Delivery delivery = order.getDelivery();
@@ -706,23 +643,17 @@ public class OrderServiceImpl implements OrderService {
             trackingInfo.put("estimatedDelivery", delivery.getDeliveredDate() != null ?
                     delivery.getDeliveredDate().format(DateTimeFormatter.ofPattern("dd/MM/yyyy")) : "Đang cập nhật");
 
-            // Link theo dõi - giả định không có trường URL theo dõi
             statusDetails.put("trackingInfo", trackingInfo);
         }
 
-        // Lý do hủy đơn (nếu đơn bị hủy)
         if ("CANCELLED".equals(order.getOrderStatus().name()) && order.getNote() != null) {
             statusDetails.put("cancellationReason", order.getNote());
         }
 
-        // Link xem chi tiết đơn hàng
-        statusDetails.put("orderLink", "http://localhost:3000/account/orders/" + order.getId());
-
-        // Gửi emails
+        statusDetails.put("orderLink", FRONTEND_URL+"/account/orders/" + order.getId());
         emailService.sendOrderStatusUpdateEmail(order.getUser().getEmail(), statusDetails);
     }
 
-    // Phương thức hỗ trợ
     private double calculateSubtotal(Order order) {
         return order.getItems().stream()
                 .mapToDouble(item -> item.getUnitPrice().multiply(BigDecimal.valueOf(item.getQuantity())).doubleValue())
@@ -758,33 +689,26 @@ public class OrderServiceImpl implements OrderService {
     @Override
     @Transactional
     public OrderDTO confirmOrderDelivery(Integer orderId, String username) {
-        // Tìm đơn hàng
         Order order = orderRepository.findById(orderId)
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy đơn hàng với id: " + orderId));
 
-        // Tìm user
         User user = userRepository.findByUsername(username)
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy người dùng với username: " + username));
 
-        // Kiểm tra nếu đơn hàng thuộc về người dùng hiện tại
         if (order.getUser() == null || !order.getUser().getId().equals(user.getId())) {
             throw new IllegalArgumentException("Bạn không có quyền xác nhận đơn hàng này");
         }
 
-        // Kiểm tra trạng thái đơn hàng hiện tại
         if (order.getOrderStatus() != Order.OrderStatus.shipped) {
             throw new IllegalStateException("Chỉ có thể xác nhận đơn hàng có trạng thái 'đang giao hàng'");
         }
 
-        // Cập nhật trạng thái đơn hàng
         order.setOrderStatus(Order.OrderStatus.delivered);
 
-        // Cập nhật trạng thái giao hàng nếu có
         if (order.getDelivery() != null) {
             order.getDelivery().setShippingStatus(Delivery.ShippingStatus.delivered);
             order.getDelivery().setDeliveredDate(LocalDateTime.now());
         } else {
-            // Tìm thông tin giao hàng nếu chưa được liên kết
             Optional<Delivery> deliveryOpt = deliveryRepository.findByOrderId(order.getId());
             if (deliveryOpt.isPresent()) {
                 Delivery delivery = deliveryOpt.get();
@@ -794,10 +718,8 @@ public class OrderServiceImpl implements OrderService {
             }
         }
 
-        // Lưu đơn hàng
         Order updatedOrder = orderRepository.save(order);
 
-        // Gửi email thông báo
         sendOrderStatusUpdateEmail(updatedOrder, Order.OrderStatus.shipped.name());
 
         return convertToDTO(updatedOrder);
@@ -806,40 +728,32 @@ public class OrderServiceImpl implements OrderService {
     @Override
     @Transactional
     public OrderDTO cancelOrderByUser(Integer orderId, String username, String cancelReason) {
-        // Tìm đơn hàng
         Order order = orderRepository.findById(orderId)
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy đơn hàng với id: " + orderId));
 
-        // Tìm user
         User user = userRepository.findByUsername(username)
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy người dùng với username: " + username));
 
-        // Kiểm tra nếu đơn hàng thuộc về người dùng hiện tại
         if (order.getUser() == null || !order.getUser().getId().equals(user.getId())) {
             throw new IllegalArgumentException("Bạn không có quyền hủy đơn hàng này");
         }
 
-        // Kiểm tra trạng thái đơn hàng hiện tại
         if (order.getOrderStatus() != Order.OrderStatus.pending) {
             throw new IllegalStateException("Chỉ có thể hủy đơn hàng có trạng thái 'chờ xác nhận'");
         }
 
-        // Lưu lý do hủy nếu có
         if (cancelReason != null && !cancelReason.trim().isEmpty()) {
             order.setNote("Đơn hàng đã bị hủy bởi người dùng. Lý do: " + cancelReason);
         } else {
             order.setNote("Đơn hàng đã bị hủy bởi người dùng");
         }
 
-        // Cập nhật trạng thái đơn hàng
         String oldStatus = order.getOrderStatus().name();
         order.setOrderStatus(Order.OrderStatus.cancelled);
 
-        // Cập nhật trạng thái thanh toán nếu có
         if (order.getPayment() != null) {
             order.getPayment().setStatus(Payment.PaymentStatus.failed);
         } else {
-            // Tìm thông tin thanh toán nếu chưa được liên kết
             Optional<Payment> paymentOpt = paymentRepository.findByOrderId(order.getId());
             if (paymentOpt.isPresent()) {
                 Payment payment = paymentOpt.get();
@@ -848,11 +762,8 @@ public class OrderServiceImpl implements OrderService {
             }
         }
 
-        // Khôi phục số lượng sản phẩm trong kho
         for (OrderItem item : order.getItems()) {
-            // Không cần khôi phục tồn kho ở mức product nữa
-            
-            // Restore variant stock
+
             ProductVariant variant = item.getVariant();
             variant.setStockQuantity(variant.getStockQuantity() + item.getQuantity());
             if (variant.getStatus() == ProductVariant.VariantStatus.out_of_stock && variant.getStockQuantity() > 0) {
@@ -861,10 +772,8 @@ public class OrderServiceImpl implements OrderService {
             variantRepository.save(variant);
         }
 
-        // Lưu đơn hàng
         Order updatedOrder = orderRepository.save(order);
 
-        // Gửi email thông báo
         sendOrderStatusUpdateEmail(updatedOrder, oldStatus);
 
         return convertToDTO(updatedOrder);

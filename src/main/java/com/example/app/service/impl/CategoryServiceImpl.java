@@ -5,6 +5,7 @@ import com.example.app.entity.Category;
 import com.example.app.exception.ResourceNotFoundException;
 import com.example.app.repository.CategoryRepository;
 import com.example.app.service.CategoryService;
+import com.example.app.service.FileStorageService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -12,7 +13,9 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
 
+import java.io.IOException;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -20,10 +23,12 @@ import java.util.stream.Collectors;
 public class CategoryServiceImpl implements CategoryService {
 
     private final CategoryRepository categoryRepository;
+    private final FileStorageService fileStorageService;
 
     @Autowired
-    public CategoryServiceImpl(CategoryRepository categoryRepository) {
+    public CategoryServiceImpl(CategoryRepository categoryRepository, FileStorageService fileStorageService) {
         this.categoryRepository = categoryRepository;
+        this.fileStorageService = fileStorageService;
     }
 
     @Override
@@ -85,7 +90,6 @@ public class CategoryServiceImpl implements CategoryService {
     @Override
     @Transactional
     public CategoryDTO createCategory(CategoryDTO categoryDTO) {
-        // Check if category with same name already exists
         if (categoryRepository.existsByName(categoryDTO.getName())) {
             throw new IllegalArgumentException("Category already exists with name: " + categoryDTO.getName());
         }
@@ -116,7 +120,6 @@ public class CategoryServiceImpl implements CategoryService {
         Category category = categoryRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Category not found with id: " + id));
 
-        // Check if trying to update to a name that already exists for another category
         if (!category.getName().equals(categoryDTO.getName()) && categoryRepository.existsByName(categoryDTO.getName())) {
             throw new IllegalArgumentException("Category already exists with name: " + categoryDTO.getName());
         }
@@ -126,7 +129,6 @@ public class CategoryServiceImpl implements CategoryService {
         category.setImage(categoryDTO.getImage());
 
         if (categoryDTO.getParentId() != null) {
-            // Prevent circular reference
             if (categoryDTO.getParentId().equals(id)) {
                 throw new IllegalArgumentException("Category cannot be its own parent");
             }
@@ -159,7 +161,6 @@ public class CategoryServiceImpl implements CategoryService {
             throw new IllegalArgumentException("Cannot delete category with subcategories. Remove subcategories first.");
         }
 
-        // You might want to check if there are any products with this category before deletion
 
         categoryRepository.deleteById(id);
     }
@@ -172,8 +173,26 @@ public class CategoryServiceImpl implements CategoryService {
                 .map(this::convertToDTO)
                 .collect(Collectors.toList());
     }
+    
+    @Override
+    @Transactional
+    public CategoryDTO uploadCategoryImage(Integer id, MultipartFile imageFile) {
+        try {
+            Category category = categoryRepository.findById(id)
+                    .orElseThrow(() -> new ResourceNotFoundException("Category not found with id: " + id));
+            
+            String imageUrl = fileStorageService.storeFile(imageFile, "categories", imageFile.getOriginalFilename());
+            
+            category.setImage(imageUrl);
+            
+            Category updatedCategory = categoryRepository.save(category);
+            
+            return convertToDTO(updatedCategory);
+        } catch (IOException e) {
+            throw new IllegalArgumentException("Failed to upload category image: " + e.getMessage());
+        }
+    }
 
-    // Utility method to convert Entity to DTO
     private CategoryDTO convertToDTO(Category category) {
         CategoryDTO dto = new CategoryDTO();
         dto.setId(category.getId());
@@ -190,7 +209,6 @@ public class CategoryServiceImpl implements CategoryService {
         dto.setCreatedAt(category.getCreatedAt());
         dto.setUpdatedAt(category.getUpdatedAt());
 
-        // Map subcategories (without their subcategories to avoid infinite recursion)
         List<CategoryDTO> subcategories = category.getSubcategories().stream()
                 .map(sub -> {
                     CategoryDTO subDto = new CategoryDTO();

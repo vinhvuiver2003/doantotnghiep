@@ -94,7 +94,7 @@ public class Product {
     
     @Transient
     public Integer getTotalStockQuantity() {
-        // Tạo bản sao của collection để tránh ConcurrentModificationException
+
         Set<ProductVariant> variantsCopy = new HashSet<>(variants);
         return variantsCopy.stream()
                 .mapToInt(ProductVariant::getStockQuantity)
@@ -114,17 +114,7 @@ public class Product {
         return Objects.hash(id);
     }
     
-    /**
-     * Lấy URL ảnh đại diện của sản phẩm
-     * Ưu tiên theo thứ tự:
-     * 1. Ảnh chính của biến thể mặc định
-     * 2. Bất kỳ ảnh nào của biến thể mặc định
-     * 3. Ảnh chính của sản phẩm (không thuộc về biến thể nào)
-     * 4. Bất kỳ ảnh nào của sản phẩm
-     * 5. URL ảnh mặc định nếu không tìm thấy ảnh nào
-     * 
-     * @return URL của ảnh đại diện
-     */
+
     @Transient
     public String getMainImageUrl() {
         String imageUrl = null;
@@ -132,57 +122,48 @@ public class Product {
         // 1. Ảnh chính từ biến thể mặc định
         if (defaultVariant != null && defaultVariant.getImages() != null) {
             try {
-                // Tạo bản sao để tránh ConcurrentModificationException
+
                 Set<ProductImage> imagesCopy = new HashSet<>(defaultVariant.getImages());
-                
-                // Tìm ảnh đánh dấu là primary
+
                 for (ProductImage image : imagesCopy) {
                     if (image.getIsPrimary()) {
                         return image.getImageURL();
                     }
                 }
-                
-                // Nếu không có ảnh primary, lấy ảnh đầu tiên
+
                 if (!imagesCopy.isEmpty()) {
                     return imagesCopy.iterator().next().getImageURL();
                 }
             } catch (Exception e) {
-                // Nếu có lỗi, tiếp tục với cách lấy ảnh khác
+
                 System.err.println("Error getting default variant images: " + e.getMessage());
             }
         }
-        
-        // 2. Ảnh chính từ các ảnh cấp sản phẩm
         if (images != null) {
             try {
-                // Tạo bản sao để tránh ConcurrentModificationException
                 Set<ProductImage> imagesCopy = new HashSet<>(images);
                 
-                // Tìm ảnh đánh dấu là primary và không thuộc variant nào
+
                 for (ProductImage image : imagesCopy) {
                     if (image.getVariant() == null && image.getIsPrimary()) {
                         return image.getImageURL();
                     }
                 }
                 
-                // Nếu không có ảnh primary, lấy ảnh đầu tiên không thuộc variant nào
                 for (ProductImage image : imagesCopy) {
                     if (image.getVariant() == null) {
                         return image.getImageURL();
                     }
                 }
                 
-                // Nếu vẫn không tìm thấy, lấy bất kỳ ảnh nào
                 if (!imagesCopy.isEmpty()) {
                     return imagesCopy.iterator().next().getImageURL();
                 }
             } catch (Exception e) {
-                // Nếu có lỗi, sử dụng ảnh mặc định
                 System.err.println("Error getting product images: " + e.getMessage());
             }
         }
         
-        // 3. Trả về ảnh mặc định nếu không có ảnh nào
         return "/images/default-product.jpg";
     }
 }

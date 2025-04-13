@@ -3,6 +3,7 @@ package com.example.app.config;
 
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.authentication.AuthenticationManager;
@@ -49,8 +50,9 @@ public class SecurityConfig {
         return new BCryptPasswordEncoder();
     }
 
+    @Value("${frontend.url}")
+    private String frontendUrl;
 
-    //  Tạo AuthenticationProvider để xác thực người dùng
 
     @Bean
     public AuthenticationProvider authenticationProvider() {
@@ -68,7 +70,7 @@ public class SecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
-        configuration.setAllowedOrigins(Arrays.asList("http://localhost:3000"));
+        configuration.setAllowedOrigins(Arrays.asList(frontendUrl));
         configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"));
         configuration.setAllowedHeaders(Arrays.asList("Authorization", "Content-Type", "X-Requested-With"));
         configuration.setAllowCredentials(true);
@@ -106,6 +108,7 @@ public class SecurityConfig {
                                 .requestMatchers("/api/chatbot/**").permitAll()
                                 .requestMatchers("/api/products/random").permitAll()
                                 .requestMatchers("/api-docs/**").permitAll()
+                                .requestMatchers("/api/payments/**").permitAll()
                                 .requestMatchers("/api/promotions/active").permitAll()
                                 .requestMatchers("/api/promotions/category/**").permitAll()
                                 .requestMatchers("/api/promotions/validate-code").permitAll()
@@ -118,10 +121,10 @@ public class SecurityConfig {
                                 .anyRequest().authenticated()
                 );
 
-        // Thiết lập AuthenticationProvider
+
         http.authenticationProvider(authenticationProvider());
 
-        // Thêm JWT filter
+
         http.addFilterBefore(jwtAuthenticationFilter(), UsernamePasswordAuthenticationFilter.class);
 
         return http.build();

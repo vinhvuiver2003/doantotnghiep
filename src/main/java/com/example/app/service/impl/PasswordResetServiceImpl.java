@@ -47,23 +47,18 @@ public class PasswordResetServiceImpl implements PasswordResetService {
     @Override
     @Transactional
     public void createPasswordResetTokenForUser(String email) {
-        // Tìm người dùng theo emails
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy người dùng với emails: " + email));
 
-        // Vô hiệu hóa các token đặt lại mật khẩu cũ
         List<PasswordResetToken> existingTokens = tokenRepository.findByUser(user);
         existingTokens.forEach(token -> token.setUsed(true));
         tokenRepository.saveAll(existingTokens);
 
-        // Tạo token mới
         PasswordResetToken token = new PasswordResetToken(user, tokenExpiryMinutes);
         tokenRepository.save(token);
 
-        // Tạo đường dẫn đặt lại mật khẩu
         String resetLink = emailUtils.generatePasswordResetLink(token.getToken());
 
-        // Gửi emails đặt lại mật khẩu sử dụng template
         emailService.sendPasswordResetEmail(
                 user.getEmail(),
                 user.getFirstName() + " " + user.getLastName(),
@@ -91,24 +86,19 @@ public class PasswordResetServiceImpl implements PasswordResetService {
             return false;
         }
 
-        // Kiểm tra mật khẩu mới và xác nhận mật khẩu có khớp không
         if (!passwordResetDTO.getNewPassword().equals(passwordResetDTO.getConfirmPassword())) {
             return false;
         }
 
-        // Tìm token và người dùng
         PasswordResetToken resetToken = tokenRepository.findByToken(passwordResetDTO.getToken()).get();
         User user = resetToken.getUser();
 
-        // Cập nhật mật khẩu
         user.setPasswordHash(passwordEncoder.encode(passwordResetDTO.getNewPassword()));
         userRepository.save(user);
 
-        // Đánh dấu token đã được sử dụng
         resetToken.setUsed(true);
         tokenRepository.save(resetToken);
 
-        // Gửi emails thông báo mật khẩu đã được đặt lại sử dụng template thông thường
         String emailBody = "Xin chào " + user.getFirstName() + ",\n\n"
                 + "Mật khẩu của bạn đã được đặt lại thành công.\n\n"
                 + "Nếu bạn không thực hiện thay đổi này, vui lòng liên hệ với chúng tôi ngay lập tức.\n\n"
@@ -123,10 +113,8 @@ public class PasswordResetServiceImpl implements PasswordResetService {
     @Override
     @Transactional
     public void cleanupExpiredTokens() {
-        // Tìm tất cả các token hết hạn và chưa sử dụng
         List<PasswordResetToken> expiredTokens = tokenRepository.findByUsedFalseAndExpiryDateBefore(LocalDateTime.now());
 
-        // Đánh dấu các token đã hết hạn
         expiredTokens.forEach(token -> token.setUsed(true));
         tokenRepository.saveAll(expiredTokens);
     }

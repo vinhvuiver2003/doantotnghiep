@@ -31,7 +31,6 @@ public interface CartRepository extends JpaRepository<Cart, Integer> {
     @Query("SELECT c FROM Cart c LEFT JOIN FETCH c.items WHERE c.id = :cartId")
     Optional<Cart> findByIdWithItemsForUpdate(@Param("cartId") Integer cartId);
     
-    // Phương thức tối ưu với fetch join đầy đủ
     @Query("SELECT DISTINCT c FROM Cart c " +
            "LEFT JOIN FETCH c.items i " +
            "LEFT JOIN FETCH i.product p " +

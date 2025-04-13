@@ -34,7 +34,6 @@ public class ProductVariantServiceImpl implements ProductVariantService {
 
     @Override
     public List<ProductVariantDTO> getVariantsByProduct(Integer productId) {
-        // Kiểm tra sản phẩm tồn tại
         if (!productRepository.existsById(productId)) {
             throw new ResourceNotFoundException("Product not found with id: " + productId);
         }
@@ -69,18 +68,15 @@ public class ProductVariantServiceImpl implements ProductVariantService {
     @Override
     @Transactional
     public ProductVariantDTO createVariant(ProductVariantDTO variantDTO) {
-        // Kiểm tra sản phẩm tồn tại
         Product product = productRepository.findById(variantDTO.getProductId())
                 .orElseThrow(() -> new ResourceNotFoundException("Product not found with id: " + variantDTO.getProductId()));
 
-        // Kiểm tra nếu biến thể với color và size đã tồn tại
         variantRepository.findByProductIdAndColorAndSize(
                         variantDTO.getProductId(), variantDTO.getColor(), variantDTO.getSize())
                 .ifPresent(v -> {
                     throw new IllegalArgumentException("Variant with the same color and size already exists");
                 });
 
-        // Tạo biến thể mới
         ProductVariant variant = new ProductVariant();
         variant.setProduct(product);
         variant.setColor(variantDTO.getColor());
@@ -88,11 +84,9 @@ public class ProductVariantServiceImpl implements ProductVariantService {
         variant.setStockQuantity(variantDTO.getStockQuantity());
         variant.setPriceAdjustment(variantDTO.getPriceAdjustment());
         
-        // Thêm mới: sizeType và sku
         if (variantDTO.getSizeType() != null) {
             variant.setSizeType(ProductVariant.SizeType.valueOf(variantDTO.getSizeType()));
         } else {
-            // Mặc định dựa theo loại sản phẩm
             if (product.getProductType() == Product.ProductType.footwear) {
                 variant.setSizeType(ProductVariant.SizeType.shoe_size);
             } else {
@@ -102,7 +96,6 @@ public class ProductVariantServiceImpl implements ProductVariantService {
         
         variant.setSku(variantDTO.getSku());
 
-        // Đặt trạng thái dựa trên tồn kho
         if (variantDTO.getStockQuantity() <= 0) {
             variant.setStatus(ProductVariant.VariantStatus.out_of_stock);
         } else if (variantDTO.getStatus() != null) {
@@ -118,11 +111,9 @@ public class ProductVariantServiceImpl implements ProductVariantService {
     @Override
     @Transactional
     public ProductVariantDTO updateVariant(Integer id, ProductVariantDTO variantDTO) {
-        // Kiểm tra biến thể tồn tại
         ProductVariant variant = variantRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Product variant not found with id: " + id));
 
-        // Kiểm tra nếu đang thay đổi color/size và biến thể mới đã tồn tại
         if (!variant.getColor().equals(variantDTO.getColor()) || !variant.getSize().equals(variantDTO.getSize())) {
             variantRepository.findByProductIdAndColorAndSize(
                             variant.getProduct().getId(), variantDTO.getColor(), variantDTO.getSize())
@@ -133,23 +124,19 @@ public class ProductVariantServiceImpl implements ProductVariantService {
                     });
         }
 
-        // Cập nhật thông tin
         variant.setColor(variantDTO.getColor());
         variant.setSize(variantDTO.getSize());
         variant.setStockQuantity(variantDTO.getStockQuantity());
         variant.setPriceAdjustment(variantDTO.getPriceAdjustment());
 
-        // Cập nhật sizeType nếu được cung cấp
         if (variantDTO.getSizeType() != null) {
             variant.setSizeType(ProductVariant.SizeType.valueOf(variantDTO.getSizeType()));
         }
         
-        // Cập nhật SKU nếu được cung cấp
         if (variantDTO.getSku() != null) {
             variant.setSku(variantDTO.getSku());
         }
 
-        // Cập nhật trạng thái dựa trên tồn kho
         if (variantDTO.getStockQuantity() <= 0) {
             variant.setStatus(ProductVariant.VariantStatus.out_of_stock);
         } else if (variantDTO.getStatus() != null) {
@@ -163,7 +150,6 @@ public class ProductVariantServiceImpl implements ProductVariantService {
     @Override
     @Transactional
     public ProductVariantDTO updateVariantStock(Integer id, Integer quantity) {
-        // Kiểm tra biến thể tồn tại
         ProductVariant variant = variantRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Product variant not found with id: " + id));
 
@@ -171,10 +157,8 @@ public class ProductVariantServiceImpl implements ProductVariantService {
             throw new IllegalArgumentException("Stock quantity cannot be negative");
         }
 
-        // Cập nhật tồn kho
         variant.setStockQuantity(quantity);
 
-        // Cập nhật trạng thái dựa trên tồn kho
         if (quantity <= 0) {
             variant.setStatus(ProductVariant.VariantStatus.out_of_stock);
         } else if (variant.getStatus() == ProductVariant.VariantStatus.out_of_stock) {
@@ -188,14 +172,12 @@ public class ProductVariantServiceImpl implements ProductVariantService {
     @Override
     @Transactional
     public ProductVariantDTO updateVariantStatus(Integer id, String status) {
-        // Kiểm tra biến thể tồn tại
         ProductVariant variant = variantRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Product variant not found with id: " + id));
 
         try {
             ProductVariant.VariantStatus newStatus = ProductVariant.VariantStatus.valueOf(status);
 
-            // Kiểm tra nếu đang đặt trạng thái active nhưng hết hàng
             if (newStatus == ProductVariant.VariantStatus.active && variant.getStockQuantity() <= 0) {
                 throw new IllegalArgumentException("Cannot set status to active when stock is empty");
             }
@@ -211,12 +193,10 @@ public class ProductVariantServiceImpl implements ProductVariantService {
     @Override
     @Transactional
     public void deleteVariant(Integer id) {
-        // Kiểm tra biến thể tồn tại
         if (!variantRepository.existsById(id)) {
             throw new ResourceNotFoundException("Product variant not found with id: " + id);
         }
 
-        // Xóa biến thể
         variantRepository.deleteById(id);
     }
 
@@ -228,7 +208,6 @@ public class ProductVariantServiceImpl implements ProductVariantService {
                 .collect(Collectors.toList());
     }
 
-    // Utility method to convert Entity to DTO
     private ProductVariantDTO convertToDTO(ProductVariant variant) {
         ProductVariantDTO dto = new ProductVariantDTO();
         dto.setId(variant.getId());
@@ -240,13 +219,11 @@ public class ProductVariantServiceImpl implements ProductVariantService {
         dto.setPriceAdjustment(variant.getPriceAdjustment());
         dto.setSku(variant.getSku());
 
-        // Tính giá cuối cùng = giá cơ bản + phụ thu
         BigDecimal finalPrice = variant.getProduct().getBasePrice().add(variant.getPriceAdjustment());
         dto.setFinalPrice(finalPrice);
 
         dto.setStatus(variant.getStatus().name());
         
-        // Kiểm tra nếu variant này là defaultVariant
         Product product = variant.getProduct();
         if (product.getDefaultVariant() != null && product.getDefaultVariant().getId().equals(variant.getId())) {
             dto.setIsPrimary(true);
@@ -254,7 +231,6 @@ public class ProductVariantServiceImpl implements ProductVariantService {
             dto.setIsPrimary(false);
         }
         
-        // Lấy ảnh của variant
         if (variant.getImages() != null && !variant.getImages().isEmpty()) {
             List<ProductImageDTO> imageDTOs = new ArrayList<>();
             for (ProductImage image : variant.getImages()) {

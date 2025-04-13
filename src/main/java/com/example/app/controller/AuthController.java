@@ -47,7 +47,6 @@ public class AuthController {
         if (userDTO != null) {
             return ResponseEntity.ok(ResponseWrapper.success("User information retrieved successfully", userDTO));
         } else {
-            // Tạo đối tượng ResponseWrapper<UserDTO> với data là null
             ResponseWrapper<UserDTO> response = new ResponseWrapper<>(false, "User not authenticated", null);
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(response);
         }
@@ -56,7 +55,6 @@ public class AuthController {
 
     @PostMapping("/logout")
     public ResponseEntity<ResponseWrapper<?>> logout() {
-        // Xóa Authentication khỏi SecurityContext
         SecurityContextHolder.clearContext();
         return ResponseEntity.ok(ResponseWrapper.success("Đăng xuất thành công"));
     }

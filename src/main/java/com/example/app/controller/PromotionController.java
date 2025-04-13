@@ -23,9 +23,7 @@ public class PromotionController {
         this.promotionService = promotionService;
     }
 
-    /**
-     * Lấy danh sách khuyến mãi có phân trang (chỉ ADMIN)
-     */
+
     @GetMapping
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ResponseWrapper<PagedResponse<PromotionDTO>>> getAllPromotions(
@@ -38,9 +36,7 @@ public class PromotionController {
         return ResponseEntity.ok(ResponseWrapper.success("Promotions retrieved successfully", promotions));
     }
 
-    /**
-     * Lấy thông tin chi tiết một khuyến mãi theo ID (chỉ ADMIN)
-     */
+
     @GetMapping("/{id}")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ResponseWrapper<PromotionDTO>> getPromotionById(@PathVariable Integer id) {
@@ -48,27 +44,21 @@ public class PromotionController {
         return ResponseEntity.ok(ResponseWrapper.success("Promotion retrieved successfully", promotion));
     }
 
-    /**
-     * Lấy danh sách khuyến mãi đang hoạt động (cho trang chủ)
-     */
+
     @GetMapping("/active")
     public ResponseEntity<ResponseWrapper<List<PromotionDTO>>> getActivePromotions() {
         List<PromotionDTO> promotions = promotionService.getActivePromotions();
         return ResponseEntity.ok(ResponseWrapper.success("Active promotions retrieved successfully", promotions));
     }
 
-    /**
-     * Lấy danh sách khuyến mãi theo danh mục
-     */
+
     @GetMapping("/category/{categoryId}")
     public ResponseEntity<ResponseWrapper<List<PromotionDTO>>> getPromotionsByCategory(@PathVariable Integer categoryId) {
         List<PromotionDTO> promotions = promotionService.getPromotionsByCategory(categoryId);
         return ResponseEntity.ok(ResponseWrapper.success("Category promotions retrieved successfully", promotions));
     }
 
-    /**
-     * Kiểm tra mã giảm giá có hợp lệ không
-     */
+
     @GetMapping("/validate-code")
     public ResponseEntity<ResponseWrapper<PromotionDTO>> validatePromotionCode(@RequestParam String code) {
         try {
@@ -81,9 +71,7 @@ public class PromotionController {
         }
     }
 
-    /**
-     * Tạo mới một khuyến mãi (chỉ ADMIN)
-     */
+
     @PostMapping
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ResponseWrapper<PromotionDTO>> createPromotion(@Valid @RequestBody PromotionDTO promotionDTO) {
@@ -93,9 +81,7 @@ public class PromotionController {
                 HttpStatus.CREATED);
     }
 
-    /**
-     * Cập nhật thông tin khuyến mãi (chỉ ADMIN)
-     */
+
     @PutMapping("/{id}")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ResponseWrapper<PromotionDTO>> updatePromotion(
@@ -106,9 +92,7 @@ public class PromotionController {
         return ResponseEntity.ok(ResponseWrapper.success("Promotion updated successfully", updatedPromotion));
     }
 
-    /**
-     * Xóa một khuyến mãi (chỉ ADMIN)
-     */
+
     @DeleteMapping("/{id}")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ResponseWrapper<?>> deletePromotion(@PathVariable Integer id) {
@@ -116,9 +100,7 @@ public class PromotionController {
         return ResponseEntity.ok(ResponseWrapper.success("Promotion deleted successfully"));
     }
 
-    /**
-     * Lấy khuyến mãi theo mã code
-     */
+
     @GetMapping("/code/{code}")
     public ResponseEntity<ResponseWrapper<PromotionDTO>> getPromotionByCode(@PathVariable String code) {
         PromotionDTO promotion = promotionService.getPromotionByCode(code);

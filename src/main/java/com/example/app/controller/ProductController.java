@@ -32,9 +32,7 @@ public class ProductController {
         this.productService = productService;
     }
 
-    /**
-     * Lấy danh sách tất cả sản phẩm với phân trang
-     */
+
     @Operation(
             summary = "Lấy danh sách sản phẩm có phân trang",
             description = "Trả về danh sách sản phẩm phân trang theo các tiêu chí sắp xếp"
@@ -61,9 +59,7 @@ public class ProductController {
         }
     }
 
-    /**
-     * Lấy thông tin chi tiết một sản phẩm theo ID
-     */
+
     @Operation(
             summary = "Lấy thông tin sản phẩm theo ID",
             description = "Trả về thông tin chi tiết của sản phẩm theo ID cung cấp"
@@ -85,9 +81,7 @@ public class ProductController {
         }
     }
 
-    /**
-     * Lấy danh sách sản phẩm theo danh mục
-     */
+
     @GetMapping("/category/{categoryId}")
     public ResponseEntity<?> getProductsByCategory(
             @PathVariable Integer categoryId,
@@ -105,9 +99,7 @@ public class ProductController {
         }
     }
 
-    /**
-     * Lấy danh sách sản phẩm theo thương hiệu
-     */
+
     @GetMapping("/brand/{brandId}")
     public ResponseEntity<?> getProductsByBrand(
             @PathVariable Integer brandId,
@@ -125,9 +117,7 @@ public class ProductController {
         }
     }
 
-    /**
-     * Tìm kiếm sản phẩm theo từ khóa
-     */
+
     @GetMapping("/search")
     public ResponseEntity<?> searchProducts(
             @RequestParam String keyword,
@@ -145,9 +135,7 @@ public class ProductController {
         }
     }
 
-    /**
-     * Lọc sản phẩm theo khoảng giá
-     */
+
     @GetMapping("/filter/price")
     public ResponseEntity<?> filterProductsByPrice(
             @RequestParam BigDecimal minPrice,
@@ -166,9 +154,7 @@ public class ProductController {
         }
     }
 
-    /**
-     * Lấy danh sách sản phẩm mới nhất
-     */
+
     @GetMapping("/new-arrivals")
     public ResponseEntity<?> getNewArrivals(
             @RequestParam(defaultValue = "8") int limit) {
@@ -182,9 +168,7 @@ public class ProductController {
         }
     }
 
-    /**
-     * Lấy danh sách sản phẩm được đánh giá cao nhất
-     */
+
     @GetMapping("/top-rated")
     public ResponseEntity<?> getTopRatedProducts(
             @RequestParam(defaultValue = "8") int limit) {
@@ -198,9 +182,7 @@ public class ProductController {
         }
     }
 
-    /**
-     * Lấy danh sách sản phẩm bán chạy nhất
-     */
+
     @GetMapping("/best-selling")
     public ResponseEntity<?> getBestSellingProducts(
             @RequestParam(defaultValue = "8") int limit) {
@@ -214,9 +196,7 @@ public class ProductController {
         }
     }
 
-    /**
-     * Lấy danh sách sản phẩm có tồn kho thấp (chỉ ADMIN)
-     */
+
     @GetMapping("/low-stock")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<?> getLowStockProducts(
@@ -231,9 +211,7 @@ public class ProductController {
         }
     }
 
-    /**
-     * Tạo mới một sản phẩm (chỉ ADMIN)
-     */
+
     @PostMapping
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<?> createProduct(@Valid @RequestBody ProductDTO productDTO) {
@@ -248,9 +226,7 @@ public class ProductController {
         }
     }
 
-    /**
-     * Cập nhật thông tin một sản phẩm (chỉ ADMIN)
-     */
+
     @PutMapping("/{id}")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<?> updateProduct(
@@ -266,9 +242,7 @@ public class ProductController {
         }
     }
 
-    /**
-     * Xóa một sản phẩm (chỉ ADMIN)
-     */
+
     @DeleteMapping("/{id}")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<?> deleteProduct(@PathVariable Integer id) {

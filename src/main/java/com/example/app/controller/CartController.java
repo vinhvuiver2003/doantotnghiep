@@ -22,7 +22,6 @@ public class CartController {
     public CartController(CartService cartService) {
         this.cartService = cartService;
     }
-    // Lấy giỏ hàng của nguời dùng, nếu chưa có thì tạo mói
     @GetMapping("/my-cart")
     public ResponseEntity<ResponseWrapper<CartDTO>> getMyCart() {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
@@ -105,7 +104,6 @@ public class CartController {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
 
         if (authentication == null || !authentication.isAuthenticated() || authentication.getPrincipal().equals("anonymousUser")) {
-            // Sử dụng cast để khớp kiểu dữ liệu
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
                     .body((ResponseWrapper<CartDTO>) ResponseWrapper.error("User must be logged in to merge carts"));
         }

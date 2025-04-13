@@ -63,13 +63,11 @@ public class EmailServiceImpl implements EmailService {
     @Override
     public void sendTemplateEmail(String to, String subject, String templateName, Map<String, Object> variables) {
         try {
-            // Tạo nội dung emails từ template
             String templateContent = FreeMarkerTemplateUtils.processTemplateIntoString(
                     freemarkerConfigurer.getConfiguration().getTemplate("emails/" + templateName + ".html"),
                     variables
             );
 
-            // Gửi emails
             sendHtmlEmail(to, subject, templateContent);
         } catch (Exception e) {
             throw new RuntimeException("Không thể gửi emails từ template: " + templateName, e);

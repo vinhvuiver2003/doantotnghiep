@@ -77,12 +77,10 @@ public class PromotionServiceImpl implements PromotionService {
     @Override
     @Transactional
     public PromotionDTO createPromotion(PromotionDTO promotionDTO) {
-        // Validate promotion data
         if (promotionDTO.getStartDate().isAfter(promotionDTO.getEndDate())) {
             throw new IllegalArgumentException("Start date must be before end date");
         }
 
-        // Check if code already exists
         if (promotionDTO.getCode() != null && !promotionDTO.getCode().isEmpty()) {
             promotionRepository.findByCode(promotionDTO.getCode())
                     .ifPresent(p -> {
@@ -106,7 +104,6 @@ public class PromotionServiceImpl implements PromotionService {
             promotion.setStatus(Promotion.PromotionStatus.valueOf(promotionDTO.getStatus()));
         }
 
-        // Add categories if provided
         if (promotionDTO.getCategories() != null && !promotionDTO.getCategories().isEmpty()) {
             Set<Category> categories = new HashSet<>();
 
@@ -130,12 +127,10 @@ public class PromotionServiceImpl implements PromotionService {
         Promotion promotion = promotionRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Promotion not found with id: " + id));
 
-        // Validate promotion data
         if (promotionDTO.getStartDate().isAfter(promotionDTO.getEndDate())) {
             throw new IllegalArgumentException("Start date must be before end date");
         }
 
-        // Check if code already exists (if changed)
         if (promotionDTO.getCode() != null && !promotionDTO.getCode().isEmpty() &&
                 !promotionDTO.getCode().equals(promotion.getCode())) {
             promotionRepository.findByCode(promotionDTO.getCode())
@@ -158,7 +153,6 @@ public class PromotionServiceImpl implements PromotionService {
             promotion.setStatus(Promotion.PromotionStatus.valueOf(promotionDTO.getStatus()));
         }
 
-        // Update categories if provided
         if (promotionDTO.getCategories() != null) {
             Set<Category> categories = new HashSet<>();
 
@@ -179,7 +173,6 @@ public class PromotionServiceImpl implements PromotionService {
     @Override
     @Transactional
     public void deletePromotion(Integer id) {
-        // Check if promotion exists
         if (!promotionRepository.existsById(id)) {
             throw new ResourceNotFoundException("Promotion not found with id: " + id);
         }
@@ -199,7 +192,6 @@ public class PromotionServiceImpl implements PromotionService {
 
     @Override
     public List<PromotionDTO> getPromotionsByCategory(Integer categoryId) {
-        // Check if category exists
         if (!categoryRepository.existsById(categoryId)) {
             throw new ResourceNotFoundException("Category not found with id: " + categoryId);
         }
@@ -217,23 +209,19 @@ public class PromotionServiceImpl implements PromotionService {
         Promotion promotion = promotionRepository.findByCode(code)
                 .orElseThrow(() -> new ResourceNotFoundException("Promotion not found with code: " + code));
 
-        // Check if promotion is active
         LocalDateTime now = LocalDateTime.now();
         if (promotion.getStatus() != Promotion.PromotionStatus.active) {
             throw new IllegalArgumentException("Promotion is not active");
         }
 
-        // Check if promotion has started
         if (now.isBefore(promotion.getStartDate())) {
             throw new IllegalArgumentException("Promotion has not started yet");
         }
 
-        // Check if promotion has ended
         if (now.isAfter(promotion.getEndDate())) {
             throw new IllegalArgumentException("Promotion has already ended");
         }
 
-        // Check usage limit
         if (promotion.getUsageLimit() != null && promotion.getUsageCount() >= promotion.getUsageLimit()) {
             throw new IllegalArgumentException("Promotion usage limit exceeded");
         }
@@ -241,7 +229,6 @@ public class PromotionServiceImpl implements PromotionService {
         return convertToDTO(promotion);
     }
 
-    // Utility method to convert Entity to DTO
     private PromotionDTO convertToDTO(Promotion promotion) {
         PromotionDTO dto = new PromotionDTO();
         dto.setId(promotion.getId());
@@ -259,7 +246,6 @@ public class PromotionServiceImpl implements PromotionService {
         dto.setCreatedAt(promotion.getCreatedAt());
         dto.setUpdatedAt(promotion.getUpdatedAt());
 
-        // Map categories
         List<CategoryDTO> categoryDTOs = promotion.getCategories().stream()
                 .map(category -> {
                     CategoryDTO categoryDTO = new CategoryDTO();

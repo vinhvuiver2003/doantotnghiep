@@ -65,11 +65,9 @@ public class RoleServiceImpl implements RoleService {
     @Override
     @Transactional
     public RoleDTO updateRole(Integer id, RoleDTO roleDTO) {
-        // Kiểm tra vai trò tồn tại
         Role role = roleRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Role not found with id: " + id));
 
-        // Kiểm tra tên mới đã tồn tại chưa (nếu tên thay đổi)
         if (!role.getName().equals(roleDTO.getName()) && roleRepository.existsByName(roleDTO.getName())) {
             throw new IllegalArgumentException("Role already exists with name: " + roleDTO.getName());
         }
@@ -83,11 +81,9 @@ public class RoleServiceImpl implements RoleService {
     @Override
     @Transactional
     public void deleteRole(Integer id) {
-        // Kiểm tra vai trò tồn tại
         Role role = roleRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Role not found with id: " + id));
 
-        // Kiểm tra có người dùng nào sử dụng vai trò này không
         long userCount = userRepository.findByRoleId(id).size();
         if (userCount > 0) {
             throw new IllegalArgumentException("Cannot delete role because it is assigned to " + userCount + " users");
@@ -101,7 +97,6 @@ public class RoleServiceImpl implements RoleService {
         return roleRepository.existsByName(name);
     }
 
-    // Utility method to convert Entity to DTO
     private RoleDTO convertToDTO(Role role) {
         RoleDTO dto = new RoleDTO();
         dto.setId(role.getId());

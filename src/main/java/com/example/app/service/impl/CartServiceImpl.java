@@ -59,42 +59,35 @@ public class CartServiceImpl implements CartService {
 
     @Override
     public CartDTO getCartByUserId(Integer userId) {
-        // Check if user exists
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found with id: " + userId));
 
-        // Find user's cart or create a new one - chỉ lấy giỏ hàng mới nhất
-        org.springframework.data.domain.PageRequest pageRequest = 
+        org.springframework.data.domain.PageRequest pageRequest =
             org.springframework.data.domain.PageRequest.of(0, 1);
         List<Cart> userCarts = cartRepository.findByUserIdOrderByUpdatedAtDesc(userId, pageRequest);
 
         if (!userCarts.isEmpty()) {
             Cart cart = userCarts.get(0);
-            // Kiểm tra nếu giỏ hàng đã được thanh toán, tạo giỏ hàng mới
             if (cart.getIsCheckedOut()) {
                 return createCart(userId, null);
             }
             return convertToDTO(cart);
         } else {
-            // Create new cart for user
             return createCart(userId, null);
         }
     }
 
     @Override
     public CartDTO getCartBySessionId(String sessionId) {
-        // Find cart by session ID or create a new one
         Optional<Cart> optionalCart = cartRepository.findBySessionIdWithFullDetails(sessionId);
 
         if (optionalCart.isPresent()) {
             Cart cart = optionalCart.get();
-            // Kiểm tra nếu giỏ hàng đã được thanh toán, tạo giỏ hàng mới
             if (cart.getIsCheckedOut()) {
                 return createCart(null, sessionId);
             }
             return convertToDTO(cart);
         } else {
-            // Create new cart for guest
             return createCart(null, sessionId);
         }
     }
@@ -130,12 +123,10 @@ public class CartServiceImpl implements CartService {
         ProductVariant variant = variantRepository.findByIdWithImages(cartItemDTO.getVariantId())
                 .orElseThrow(() -> new ResourceNotFoundException("Variant not found with id: " + cartItemDTO.getVariantId()));
 
-        // Check if product is active
         if (product.getStatus() != Product.ProductStatus.active) {
             throw new IllegalArgumentException("Product is not available");
         }
 
-        // Check if variant is active and in stock
         if (variant.getStatus() != ProductVariant.VariantStatus.active) {
             throw new IllegalArgumentException("Variant is not available");
         }
@@ -144,17 +135,14 @@ public class CartServiceImpl implements CartService {
             throw new IllegalArgumentException("Not enough stock available");
         }
 
-        // Check if item already exists in cart
         Optional<CartItem> existingItem = cartItemRepository.findByCartIdAndProductIdAndVariantId(
                 cartId, cartItemDTO.getProductId(), cartItemDTO.getVariantId());
 
         if (existingItem.isPresent()) {
-            // Update quantity
             CartItem item = existingItem.get();
             item.setQuantity(item.getQuantity() + cartItemDTO.getQuantity());
             cartItemRepository.save(item);
         } else {
-            // Add new item
             CartItem newItem = new CartItem();
             newItem.setCart(cart);
             newItem.setProduct(product);
@@ -167,7 +155,6 @@ public class CartServiceImpl implements CartService {
         cart.setUpdatedAt(LocalDateTime.now());
         cartRepository.save(cart);
 
-        // Refresh cart data
         Cart updatedCart = cartRepository.findByIdWithFullDetails(cartId)
                 .orElseThrow(() -> new ResourceNotFoundException("Cart not found with id: " + cartId));
 
@@ -183,23 +170,18 @@ public class CartServiceImpl implements CartService {
         CartItem cartItem = cartItemRepository.findById(cartItemId)
                 .orElseThrow(() -> new ResourceNotFoundException("Cart item not found with id: " + cartItemId));
 
-        // Verify cart item belongs to the cart
         if (!cartItem.getCart().getId().equals(cartId)) {
             throw new IllegalArgumentException("Cart item does not belong to the specified cart");
         }
 
-        // Validate quantity
         if (quantity <= 0) {
-            // Remove item if quantity is 0 or negative
             cartItemRepository.delete(cartItem);
         } else {
-            // Check stock
             ProductVariant variant = cartItem.getVariant();
             if (variant.getStockQuantity() < quantity) {
                 throw new IllegalArgumentException("Not enough stock available");
             }
 
-            // Update quantity
             cartItem.setQuantity(quantity);
             cartItemRepository.save(cartItem);
         }
@@ -207,7 +189,6 @@ public class CartServiceImpl implements CartService {
         cart.setUpdatedAt(LocalDateTime.now());
         cartRepository.save(cart);
 
-        // Refresh cart data
         Cart updatedCart = cartRepository.findByIdWithFullDetails(cartId)
                 .orElseThrow(() -> new ResourceNotFoundException("Cart not found with id: " + cartId));
 
@@ -223,18 +204,15 @@ public class CartServiceImpl implements CartService {
         CartItem cartItem = cartItemRepository.findById(cartItemId)
                 .orElseThrow(() -> new ResourceNotFoundException("Cart item not found with id: " + cartItemId));
 
-        // Verify cart item belongs to the cart
         if (!cartItem.getCart().getId().equals(cartId)) {
             throw new IllegalArgumentException("Cart item does not belong to the specified cart");
         }
 
-        // Remove item
         cartItemRepository.delete(cartItem);
 
         cart.setUpdatedAt(LocalDateTime.now());
         cartRepository.save(cart);
 
-        // Refresh cart data
         Cart updatedCart = cartRepository.findByIdWithFullDetails(cartId)
                 .orElseThrow(() -> new ResourceNotFoundException("Cart not found with id: " + cartId));
 
@@ -247,7 +225,6 @@ public class CartServiceImpl implements CartService {
         Cart cart = cartRepository.findById(cartId)
                 .orElseThrow(() -> new ResourceNotFoundException("Cart not found with id: " + cartId));
 
-        // Delete all items in the cart
         cartItemRepository.deleteByCartId(cartId);
 
         cart.setUpdatedAt(LocalDateTime.now());
@@ -261,7 +238,6 @@ public class CartServiceImpl implements CartService {
         List<Cart> expiredCarts = cartRepository.findExpiredGuestCarts(expirationDate);
 
         for (Cart cart : expiredCarts) {
-            // Delete all items in the cart
             cartItemRepository.deleteByCartId(cart.getId());
 
             // Delete the cart
@@ -272,21 +248,18 @@ public class CartServiceImpl implements CartService {
     @Override
     @Transactional
     public void mergeGuestCartWithUserCart(String sessionId, Integer userId) {
-        // Find guest cart
         Optional<Cart> optionalGuestCart = cartRepository.findBySessionId(sessionId);
         if (!optionalGuestCart.isPresent()) {
             return; // No guest cart to merge
         }
 
-        // Find or create user cart
-        org.springframework.data.domain.PageRequest pageRequest = 
+        org.springframework.data.domain.PageRequest pageRequest =
             org.springframework.data.domain.PageRequest.of(0, 1);
         List<Cart> userCarts = cartRepository.findByUserIdOrderByUpdatedAtDesc(userId, pageRequest);
         Cart userCart;
 
         if (!userCarts.isEmpty()) {
             userCart = userCarts.get(0);
-            // Kiểm tra nếu giỏ hàng người dùng đã thanh toán, tạo giỏ hàng mới
             if (userCart.getIsCheckedOut()) {
                 User user = userRepository.findById(userId)
                         .orElseThrow(() -> new ResourceNotFoundException("User not found with id: " + userId));
@@ -306,26 +279,21 @@ public class CartServiceImpl implements CartService {
 
         Cart guestCart = optionalGuestCart.get();
         
-        // Kiểm tra nếu giỏ hàng khách đã thanh toán, bỏ qua việc hợp nhất
         if (guestCart.getIsCheckedOut()) {
             return;
         }
 
-        // Merge items
         List<CartItem> guestItems = cartItemRepository.findByCartId(guestCart.getId());
 
         for (CartItem guestItem : guestItems) {
-            // Check if item already exists in user cart
             Optional<CartItem> existingUserItem = cartItemRepository.findByCartIdAndProductIdAndVariantId(
                     userCart.getId(), guestItem.getProduct().getId(), guestItem.getVariant().getId());
 
             if (existingUserItem.isPresent()) {
-                // Update quantity
                 CartItem userItem = existingUserItem.get();
                 userItem.setQuantity(userItem.getQuantity() + guestItem.getQuantity());
                 cartItemRepository.save(userItem);
             } else {
-                // Create new item in user cart
                 CartItem newUserItem = new CartItem();
                 newUserItem.setCart(userCart);
                 newUserItem.setProduct(guestItem.getProduct());
@@ -336,35 +304,29 @@ public class CartServiceImpl implements CartService {
             }
         }
 
-        // Update user cart timestamp
         userCart.setUpdatedAt(LocalDateTime.now());
         cartRepository.save(userCart);
 
-        // Delete guest cart and its items
         cartItemRepository.deleteByCartId(guestCart.getId());
         cartRepository.delete(guestCart);
     }
 
     @Override
     public CartDTO getCartByCurrentUser(String username) {
-        // Tìm user từ username
         User user = userRepository.findByUsername(username)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found with username: " + username));
 
-        // Tìm giỏ hàng của user hoặc tạo mới - chỉ lấy giỏ hàng mới nhất
-        org.springframework.data.domain.PageRequest pageRequest = 
+        org.springframework.data.domain.PageRequest pageRequest =
             org.springframework.data.domain.PageRequest.of(0, 1);
         List<Cart> userCarts = cartRepository.findByUserIdOrderByUpdatedAtDesc(user.getId(), pageRequest);
 
         if (!userCarts.isEmpty()) {
             Cart cart = userCarts.get(0);
-            // Kiểm tra nếu giỏ hàng đã được thanh toán, tạo giỏ hàng mới
             if (cart.getIsCheckedOut()) {
                 return createCart(user.getId(), null);
             }
             return convertToDTO(cart);
         } else {
-            // Tạo giỏ hàng mới cho user
             return createCart(user.getId(), null);
         }
     }
@@ -372,32 +334,26 @@ public class CartServiceImpl implements CartService {
     @Override
     @Transactional
     public CartDTO mergeGuestCartWithUserCart(String sessionId, String username) {
-        // Tìm user từ username
         User user = userRepository.findByUsername(username)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found with username: " + username));
 
-        // Tìm giỏ hàng khách từ sessionId
         Optional<Cart> optionalGuestCart = cartRepository.findBySessionId(sessionId);
         if (!optionalGuestCart.isPresent()) {
             throw new ResourceNotFoundException("Guest cart not found with sessionId: " + sessionId);
         }
 
         Cart guestCart = optionalGuestCart.get();
-        // Kiểm tra nếu giỏ hàng khách đã thanh toán, bỏ qua việc hợp nhất
         if (guestCart.getIsCheckedOut()) {
-            // Trả về giỏ hàng hiện tại của người dùng hoặc tạo mới
             return getCartByCurrentUser(username);
         }
 
-        // Tìm hoặc tạo giỏ hàng người dùng
-        org.springframework.data.domain.PageRequest pageRequest = 
+        org.springframework.data.domain.PageRequest pageRequest =
             org.springframework.data.domain.PageRequest.of(0, 1);
         List<Cart> userCarts = cartRepository.findByUserIdOrderByUpdatedAtDesc(user.getId(), pageRequest);
         Cart userCart;
 
         if (!userCarts.isEmpty()) {
             userCart = userCarts.get(0);
-            // Kiểm tra nếu giỏ hàng người dùng đã thanh toán, tạo giỏ hàng mới
             if (userCart.getIsCheckedOut()) {
                 userCart = new Cart();
                 userCart.setUser(user);
@@ -409,21 +365,17 @@ public class CartServiceImpl implements CartService {
             userCart = cartRepository.save(userCart);
         }
 
-        // Hợp nhất các mục trong giỏ hàng
         List<CartItem> guestItems = cartItemRepository.findByCartId(guestCart.getId());
 
         for (CartItem guestItem : guestItems) {
-            // Kiểm tra xem sản phẩm đã tồn tại trong giỏ hàng người dùng chưa
             Optional<CartItem> existingUserItem = cartItemRepository.findByCartIdAndProductIdAndVariantId(
                     userCart.getId(), guestItem.getProduct().getId(), guestItem.getVariant().getId());
 
             if (existingUserItem.isPresent()) {
-                // Cập nhật số lượng
                 CartItem userItem = existingUserItem.get();
                 userItem.setQuantity(userItem.getQuantity() + guestItem.getQuantity());
                 cartItemRepository.save(userItem);
             } else {
-                // Tạo mục mới trong giỏ hàng người dùng
                 CartItem newUserItem = new CartItem();
                 newUserItem.setCart(userCart);
                 newUserItem.setProduct(guestItem.getProduct());
@@ -434,22 +386,18 @@ public class CartServiceImpl implements CartService {
             }
         }
 
-        // Cập nhật thời gian cho giỏ hàng người dùng
         userCart.setUpdatedAt(LocalDateTime.now());
         cartRepository.save(userCart);
 
-        // Xóa giỏ hàng khách và các mục trong đó
         cartItemRepository.deleteByCartId(guestCart.getId());
         cartRepository.delete(guestCart);
 
-        // Lấy giỏ hàng người dùng đã cập nhật
         Cart updatedUserCart = cartRepository.findByIdWithItems(userCart.getId())
                 .orElseThrow(() -> new ResourceNotFoundException("User cart not found after merging"));
 
         return convertToDTO(updatedUserCart);
     }
 
-    // Utility method to convert Entity to DTO
     private CartDTO convertToDTO(Cart cart) {
         CartDTO dto = new CartDTO();
         dto.setId(cart.getId());
@@ -463,7 +411,6 @@ public class CartServiceImpl implements CartService {
         dto.setCreatedAt(cart.getCreatedAt());
         dto.setUpdatedAt(cart.getUpdatedAt());
 
-        // Get cart items
         List<CartItemDTO> itemDTOs = new ArrayList<>();
         BigDecimal totalAmount = BigDecimal.ZERO;
 
@@ -474,7 +421,6 @@ public class CartServiceImpl implements CartService {
             itemDTO.setProductId(item.getProduct().getId());
             itemDTO.setProductName(item.getProduct().getName());
             
-            // Sử dụng phương thức tiện ích để lấy ảnh đại diện
             itemDTO.setProductImage(item.getProduct().getMainImageUrl());
             
             itemDTO.setVariantId(item.getVariant().getId());
@@ -482,7 +428,6 @@ public class CartServiceImpl implements CartService {
             itemDTO.setSize(item.getVariant().getSize());
             itemDTO.setQuantity(item.getQuantity());
 
-            // Calculate prices
             BigDecimal unitPrice = item.getProduct().getBasePrice().add(item.getVariant().getPriceAdjustment());
             itemDTO.setUnitPrice(unitPrice);
 

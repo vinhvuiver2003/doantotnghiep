@@ -79,7 +79,6 @@ public class BrandServiceImpl implements BrandService {
         Brand brand = brandRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Brand not found with id: " + id));
 
-        // Check if trying to update to a name that already exists for another brand
         if (!brand.getName().equals(brandDTO.getName()) && brandRepository.existsByName(brandDTO.getName())) {
             throw new IllegalArgumentException("Brand already exists with name: " + brandDTO.getName());
         }
@@ -100,8 +99,6 @@ public class BrandServiceImpl implements BrandService {
         if (!brandRepository.existsById(id)) {
             throw new ResourceNotFoundException("Brand not found with id: " + id);
         }
-
-        // You might want to check if there are any products with this brand before deletion
 
         brandRepository.deleteById(id);
     }

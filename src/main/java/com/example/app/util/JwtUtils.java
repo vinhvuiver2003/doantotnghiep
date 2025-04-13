@@ -19,11 +19,7 @@ public class JwtUtils {
     @Value("${fashion.app.jwtExpirationMs}")
     private int jwtExpirationMs;
 
-    /**
-     * Tạo JWT token từ Authentication
-     * @param authentication Đối tượng Authentication sau khi xác thực
-     * @return JWT token dưới dạng String
-     */
+
     public String generateJwtToken(Authentication authentication) {
         UserDetails userPrincipal = (UserDetails) authentication.getPrincipal();
 
@@ -35,11 +31,7 @@ public class JwtUtils {
                 .compact();
     }
 
-    /**
-     * Lấy username từ JWT token
-     * @param token JWT token
-     * @return Username được lưu trong token
-     */
+
     public String getUsernameFromJWT(String token) {
         return Jwts.parser()
                 .setSigningKey(jwtSecret)
@@ -48,11 +40,7 @@ public class JwtUtils {
                 .getSubject();
     }
 
-    /**
-     * Xác thực token
-     * @param authToken JWT token cần xác thực
-     * @return true nếu token hợp lệ, false nếu không
-     */
+
     public boolean validateToken(String authToken) {
         try {
             Jwts.parser().setSigningKey(jwtSecret).parseClaimsJws(authToken);

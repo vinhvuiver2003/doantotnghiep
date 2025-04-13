@@ -29,22 +29,17 @@ public class VerificationController {
     @GetMapping("/verify")
     @Transactional
     public ResponseEntity<ResponseWrapper<?>> verifyEmail(@RequestParam("token") String token) {
-        // Kiểm tra token có hợp lệ không
         if (!tokenService.validateToken(token)) {
             return ResponseEntity.badRequest()
                     .body(new ResponseWrapper<>(false, "Token xác thực không hợp lệ hoặc đã hết hạn", null));
         }
 
-        // Lấy token từ database
         VerificationToken verificationToken = tokenService.findByToken(token);
 
-        // Cập nhật trạng thái người dùng (ví dụ: isEnabled = true)
         User user = verificationToken.getUser();
-        // TODO: Cập nhật trạng thái người dùng tùy theo yêu cầu của ứng dụng
-        // user.setEnabled(true);
-        userRepository.save(user);
 
-        // Đánh dấu token đã được sử dụng
+
+
         tokenService.markTokenAsUsed(token);
 
         return ResponseEntity.ok()
